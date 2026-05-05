@@ -1,0 +1,5 @@
+float32 velocity
+---
+bool success
+---
+float32 current_pitch

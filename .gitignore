@@ -1,0 +1,79 @@
+# ROS2 build artifacts
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+*.egg
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+*.cover
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# ML model files (large binaries)
+*.pt
+*.pth
+*.onnx
+*.engine
+*.trt
+*.weights
+*.pb
+*.tflite
+
+# Compressed archives
+*.zip
+*.tar.gz
+*.tar.bz2
+*.7z
+*.rar
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Colcon
+.colcon_install_layout
+
+# Secrets / credentials
+.env
+.env.*
+*.pem
+*.key
+*.crt
+secrets.yaml
+credentials.json
+
+# Misc
+*.log
+*.tmp
+cmd.txt

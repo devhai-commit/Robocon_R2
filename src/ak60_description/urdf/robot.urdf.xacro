@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="ak60_robot">
+
+  <xacro:include filename="properties.xacro"/>
+  <xacro:include filename="wheel.xacro"/>
+  <xacro:include filename="chassis.xacro"/>
+  <xacro:include filename="manipulator.xacro"/>
+  <xacro:include filename="ros2_control.xacro"/>
+  <xacro:ak60_ros2_control/>
+
+</robot>

@@ -1,0 +1,33 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 50
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    # TÊN MỚI
+    rocker_bogie_controller:
+      type: ak60_robot_driver_control/RockerBogieController
+      enable_odom_tf: false
+
+    arm_controller:
+      type: position_controllers/JointGroupPositionController
+
+# CẤU HÌNH THAM SỐ CHO TÊN MỚI
+rocker_bogie_controller:
+  ros__parameters:
+    wheel_base_front: 0.28 
+    wheel_base_rear: 0.28 
+    track_width: 0.47       
+    wheel_radius: 0.0635
+
+# Cấu hình chi tiết cho cánh tay
+arm_controller:
+  ros__parameters:
+    joints:
+      - arm_joint_1
+      - arm_joint_2
+      - arm_joint_3
+      - gripper_joint
+    
+      

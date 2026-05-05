@@ -1,0 +1,7 @@
+<library path="ak60_robot_driver_control">
+  <class name="ak60_robot_driver_control/RockerBogieController"
+         type="ak60_robot_driver_control::RockerBogieController"
+         base_class_type="controller_interface::ControllerInterface">
+    <description>Custom 6-wheel Rocker Bogie kinematic controller</description>
+  </class>
+</library>

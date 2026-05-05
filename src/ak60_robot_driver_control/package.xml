@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>ak60_robot_driver_control</name>
+  <version>0.1.0</version>
+  <description>ROS2 hardware interface and custom controller for AK60 robot</description>
+
+  <maintainer email="you@example.com">Your Name</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>controller_interface</depend>
+  <depend>pluginlib</depend>
+  <depend>nav_msgs</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>realtime_tools</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+    <controller_interface plugin="${prefix}/steer_drive_controller.xml"/>
+  </export>
+</package>

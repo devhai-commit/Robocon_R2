@@ -1,0 +1,42 @@
+slam_toolbox:
+  ros__parameters:
+    # 1. Cài đặt Plugin giải toán (Chuẩn)
+    solver_plugin: solver_plugins::CeresSolver
+    ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
+    ceres_preconditioner: SCHUR_JACOBI
+    ceres_trust_region_strategy: LEVENBERG_MARQUARDT
+    ceres_dogleg_type: TRADITIONAL_DOGLEG
+    ceres_loss_function: None
+
+    # ===============================================================
+    # 2. KHUNG TỌA ĐỘ VÀ TOPIC (Đã sửa lỗi chí mạng)
+    # ===============================================================
+    odom_frame: 'odom'           # Tên frame tiêu chuẩn của EKF
+    map_frame: 'map'             # Tên frame bản đồ toàn cục
+    base_frame: 'base_link'      # Tên frame tâm robot
+    scan_topic: '/scan'          # Topic chứa dữ liệu từ YDlidar
+    # ===============================================================
+
+    mode: mapping
+    debug_logging: false
+    throttle_scans: 1               
+    
+    # [TỐI ƯU] Giảm tần số map->odom xuống 20Hz để giảm tải Jetson Orin
+    transform_publish_period: 0.05  
+    map_update_interval: 1.0        
+    resolution: 0.05                
+
+    # Các thông số Lidar
+    max_laser_range: 12.0         
+    minimum_time_interval: 0.2
+    transform_timeout: 0.5        # [TỐI ƯU] Giảm từ 1.5 xuống 0.5s để SLAM nhạy hơn khi mất mạng
+    tf_buffer_duration: 10.0
+    stack_size_to_use: 40000000
+
+    # Thuật toán Scan Matcher (Ghép điểm)
+    use_scan_matching: true
+    use_scan_barycenter: true
+    minimum_travel_distance: 0.1
+    minimum_travel_heading: 0.1
+
+    

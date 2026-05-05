@@ -1,0 +1,16 @@
+# ArmSequence.action
+# --- GOAL ---
+string pose_name         
+float32[5] target_pos    # Dùng cho J1(CAN), J4(Arm), J5(Grip)
+float32[5] target_eff    # DÙNG CHO J2(DC) và J3(DC) (-1.0 đến 1.0)
+float32 duration         
+---
+# --- RESULT ---
+bool success
+string message
+---
+# --- FEEDBACK ---
+float32[5] current_pos
+float32[5] current_eff
+float32 progress_percent
+

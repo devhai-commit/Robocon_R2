@@ -1,0 +1,27 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: ak60_description
+    relative_path: urdf/robot.urdf.xacro
+  srdf:
+    relative_path: config/ak60_robot.srdf
+  package_settings:
+    author_name: ""
+    author_email: ""
+    generated_timestamp: 1774667086
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
+      - effort
+  modified_urdf:
+    xacros:
+      - control_xacro
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
+      - effort

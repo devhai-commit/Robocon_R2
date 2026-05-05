@@ -1,0 +1,17 @@
+# Goal
+float32 arm1   # mm
+float32 arm2   # deg
+float32 arm3   # deg
+float32 gripper # deg
+
+---
+# Result
+bool success
+string message
+
+---
+# Feedback
+float32 current_arm1
+float32 current_arm2
+float32 current_arm3
+float32 current_gripper

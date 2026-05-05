@@ -1,0 +1,132 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="ak60_robot">
+
+  <xacro:property name="wheel_radius" value="0.0635"/> <xacro:property name="wheel_base_front" value="0.28"/>
+  <xacro:property name="wheel_base_rear" value="0.28"/>
+  <xacro:property name="half_track" value="0.235"/>
+
+  <link name="base_link"/>
+  
+  <link name="imu_link"/>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 0.05" rpy="0 0 0"/> 
+  </joint>
+
+  <link name="steer_1"/> <link name="steer_2"/> <link name="steer_3"/> 
+  <link name="steer_4"/> <link name="steer_5"/> <link name="steer_6"/>
+
+  <link name="wheel_1"/> <link name="wheel_2"/> <link name="wheel_3"/> 
+  <link name="wheel_4"/> <link name="wheel_5"/> <link name="wheel_6"/>
+
+  <link name="arm_1"/> <link name="arm_2"/> <link name="arm_3"/> 
+  <link name="gripper_link"/>
+
+  <joint name="wheel_steer_1" type="revolute"><parent link="base_link"/><child link="steer_1"/><limit lower="-1.57" upper="1.57" effort="10" velocity="3.14"/></joint>
+  <joint name="wheel_steer_2" type="revolute"><parent link="base_link"/><child link="steer_2"/><limit lower="-1.57" upper="1.57" effort="10" velocity="3.14"/></joint>
+  <joint name="wheel_steer_3" type="revolute"><parent link="base_link"/><child link="steer_3"/><limit lower="-1.57" upper="1.57" effort="10" velocity="3.14"/></joint>
+  <joint name="wheel_steer_4" type="revolute"><parent link="base_link"/><child link="steer_4"/><limit lower="-1.57" upper="1.57" effort="10" velocity="3.14"/></joint>
+  <joint name="wheel_steer_5" type="revolute"><parent link="base_link"/><child link="steer_5"/><limit lower="-1.57" upper="1.57" effort="10" velocity="3.14"/></joint>
+  <joint name="wheel_steer_6" type="revolute"><parent link="base_link"/><child link="steer_6"/><limit lower="-1.57" upper="1.57" effort="10" velocity="3.14"/></joint>
+
+  <joint name="wheel_joint_1" type="continuous"><parent link="steer_1"/><child link="wheel_1"/></joint>
+  <joint name="wheel_joint_2" type="continuous"><parent link="steer_2"/><child link="wheel_2"/></joint>
+  <joint name="wheel_joint_3" type="continuous"><parent link="steer_3"/><child link="wheel_3"/></joint>
+  <joint name="wheel_joint_4" type="continuous"><parent link="steer_4"/><child link="wheel_4"/></joint>
+  <joint name="wheel_joint_5" type="continuous"><parent link="steer_5"/><child link="wheel_5"/></joint>
+  <joint name="wheel_joint_6" type="continuous"><parent link="steer_6"/><child link="wheel_6"/></joint>
+  
+  <joint name="arm_joint_1" type="revolute"><parent link="base_link"/><child link="arm_1"/><limit lower="0.0" upper="8.0" effort="10" velocity="3.14"/></joint>
+  <joint name="arm_joint_2" type="revolute"><parent link="arm_1"/><child link="arm_2"/><limit lower="0.0" upper="1.57" effort="10" velocity="3.14"/></joint>
+  <joint name="arm_joint_3" type="revolute"><parent link="arm_2"/><child link="arm_3"/><limit lower="-1.57" upper="1.57" effort="10" velocity="3.14"/></joint>
+  <joint name="gripper_joint" type="revolute"><parent link="arm_3"/><child link="gripper_link"/><limit lower="0" upper="1.57" effort="10" velocity="3.14"/></joint>
+
+  <ros2_control name="RobotHardware" type="system">
+    <hardware>
+      <plugin>robot_hw_interface/Ak60RobotHwInterface</plugin>
+    </hardware>
+
+    <joint name="wheel_joint_1">
+      <command_interface name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+    <joint name="wheel_joint_2">
+      <command_interface name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+    <joint name="wheel_joint_3">
+      <command_interface name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+    <joint name="wheel_joint_4">
+      <command_interface name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+    <joint name="wheel_joint_5">
+      <command_interface name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+    <joint name="wheel_joint_6">
+      <command_interface name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+
+    <joint name="wheel_steer_1">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="wheel_steer_2">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="wheel_steer_3">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="wheel_steer_4">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="wheel_steer_5">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="wheel_steer_6">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+
+    <joint name="arm_joint_1">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="arm_joint_2">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="arm_joint_3">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+
+    <joint name="gripper_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <state_interface name="effort"/>
+    </joint>
+  </ros2_control>
+
+</robot>

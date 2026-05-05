@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:property name="offsets_file" value="$(find robot_hw_interface)/config/servo_offsets.yaml" />
+  <xacro:property name="offsets" value="${xacro.load_yaml(offsets_file)}" />
+
+  <xacro:macro name="ak60_ros2_control">
+    <ros2_control name="AK60RobotSystem" type="system">
+      <hardware>
+        <plugin>robot_hw_interface/Ak60RobotHwInterface</plugin>
+      </hardware>
+      
+      <xacro:macro name="wheel_control" params="index">
+        <joint name="wheel_steer_${index}">
+          <command_interface name="position"/>
+          <state_interface name="position"/>
+
+          <param name="motor_id">${index}</param>
+          <param name="offset">${offsets['steer_' + str(index)]}</param>
+        </joint>
+
+        <joint name="wheel_joint_${index}">
+          <command_interface name="velocity"/>
+          <state_interface name="position"/>
+          <state_interface name="velocity"/>
+          <state_interface name="effort"/>
+        </joint>
+      </xacro:macro>
+
+      <xacro:wheel_control index="1"/>
+      <xacro:wheel_control index="2"/>
+      <xacro:wheel_control index="3"/>
+      <xacro:wheel_control index="4"/>
+      <xacro:wheel_control index="5"/>
+      <xacro:wheel_control index="6"/>
+
+      <joint name="arm_joint_1">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+
+      <joint name="arm_joint_2">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <param name="motor_id">7</param>
+        <param name="offset">${offsets['arm_joint_2']}</param>
+      </joint>
+
+      <joint name="arm_joint_3">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <param name="motor_id">8</param>
+        <param name="offset">${offsets['arm_joint_3']}</param>
+      </joint>
+
+      <joint name="gripper_joint">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+        <state_interface name="effort"/>
+      </joint>
+    </ros2_control>
+  </xacro:macro>
+
+</robot>

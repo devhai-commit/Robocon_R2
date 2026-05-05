@@ -1,0 +1,45 @@
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Enabled: true
+      Robot Description: robot_description
+      Visual Enabled: true
+      Collision Enabled: false
+
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Show Names: true
+      Show Arrows: true
+
+    - Class: rviz_default_plugins/Odometry
+      Name: Odometry
+      Enabled: true
+      Topic: /odom
+      Shape: Arrow
+      Color: 255; 25; 0
+      Length: 1.0
+
+    - Class: rviz_default_plugins/Path
+      Name: Path
+      Enabled: true
+      Topic: /odom/path
+      Color: 0; 255; 0
+      Line Style: Lines
+      Line Width: 0.05
+
+  Global Options:
+    Fixed Frame: odom
+
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+
+  Views:
+    - Class: rviz_default_plugins/Orbit
+      Distance: 5.0
+      Pitch: 0.3
+      Yaw: 0.5

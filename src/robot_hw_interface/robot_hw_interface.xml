@@ -1,0 +1,9 @@
+<library path="robot_hw_interface">
+  <class name="robot_hw_interface/Ak60RobotHwInterface"
+         type="robot_hw_interface::Ak60RobotHwInterface"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+    Plugin hardware interface giao tiep qua CAN FD va Serial
+    </description>
+  </class>
+</library>

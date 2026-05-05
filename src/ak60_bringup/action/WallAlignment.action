@@ -1,0 +1,13 @@
+# Request
+float32 window_degrees    # Cửa sổ quét (VD: 10.0 độ)
+float32 goal_distance     # Khoảng cách dừng cách tường (VD: 0.5 m)
+---
+# Result
+bool success
+float32 final_distance
+float32 final_deviation
+---
+# Feedback
+string current_phase      # "ALIGNING", "SNAPPING_YAW", hoặc "APPROACHING"
+float32 current_distance
+float32 current_deviation

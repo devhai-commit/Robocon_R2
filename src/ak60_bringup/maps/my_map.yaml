@@ -1,0 +1,22 @@
+# Tên của file ảnh bản đồ nằm cùng thư mục với file yaml này
+image: my_map.pgm
+
+# Chế độ đọc bản đồ (trinary là chế độ phổ biến nhất cho SLAM 2D)
+mode: trinary
+
+# Độ phân giải: Kích thước thực tế (tính bằng mét) mà 1 pixel trên ảnh đại diện
+# 0.05 nghĩa là 1 pixel = 5 cm (Khớp với thông số resolution trong slam_toolbox)
+resolution: 0.05
+
+# Tọa độ gốc [x, y, yaw] của góc dưới cùng bên trái bức ảnh so với hệ tọa độ /map
+origin: [-10.0, -10.0, 0.0]
+
+# Đảo ngược màu sắc (0 = Bức tường màu đen, không gian trống màu trắng)
+negate: 0
+
+# Ngưỡng xác định vật cản: Pixel nào có độ đậm (đen) lớn hơn 65% thì coi là tường
+occupied_thresh: 0.65
+
+# Ngưỡng xác định vùng an toàn: Pixel nào có độ đậm nhỏ hơn 25% thì coi là đường đi
+free_thresh: 0.25
+

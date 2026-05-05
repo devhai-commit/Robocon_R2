@@ -1,0 +1,12 @@
+# Goal
+float32 target_id
+float32 desired_distance_mm
+---
+# Result
+bool success
+string message           # Thêm để báo lý do thoát (real/empty/fake)
+---
+# Feedback
+float32 error_x
+float32 error_distance_mm
+string tracking_state    # Thêm để báo trạng thái liên tục (real/empty/fake)

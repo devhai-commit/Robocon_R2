@@ -1,0 +1,66 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0.277" rpy="0 0 0"/>
+      <geometry><box size="${body_l} ${body_w} ${body_h}"/></geometry>
+      <material name="white"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.1" rpy="0 0 0"/>
+      <geometry><box size="${body_l} ${body_w} ${body_h}"/></geometry>
+    </collision>
+    <xacro:box_inertia m="${body_mass}" x="${body_l}" y="${body_w}" z="${body_h}"/>
+  </link>
+
+  <link name="imu_link">
+  <visual>
+      <origin xyz="0 0 0.277" rpy="0 0 0"/>
+      <geometry><box size="0.01 0.01 0.005"/></geometry>
+      <material name="blue"/>
+    </visual>
+  </link>
+
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/> 
+  </joint>
+
+  <link name="camera_link">
+    <visual>
+      <geometry><box size="0.03 0.1 0.03"/></geometry>
+      <material name="blue"/>
+    </visual>
+  </link>
+
+  <joint name="camera_joint" type="fixed">
+    <parent link="arm_1"/>
+    <child link="camera_link"/>
+    <origin xyz="0.015 0.0 0.085" rpy="0 0 0"/>
+  </joint>
+
+  <link name="laser_frame">
+  <visual>
+    <geometry>
+      <cylinder radius="0.05" length="0.05"/>  
+      <material name="black"/>
+    </geometry>
+  </visual>
+  </link>
+
+  <joint name="laser_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="laser_frame"/>
+    <origin xyz="0.25 0 0.15" rpy="0 0 1.5708"/> 
+  </joint>
+
+  <xacro:wheel_module index="1" x="${dx}"  y="${dy}"/>
+  <xacro:wheel_module index="2" x="0"      y="${dy}"/>
+  <xacro:wheel_module index="3" x="${-dx}" y="${dy}"/>
+  <xacro:wheel_module index="4" x="${dx}"  y="${-dy}"/>
+  <xacro:wheel_module index="5" x="0"      y="${-dy}"/>
+  <xacro:wheel_module index="6" x="${-dx}" y="${-dy}"/>
+
+</robot>
