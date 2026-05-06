@@ -62,7 +62,7 @@ def _build_main_mission(ros_node, lat, post_ramp_yaw, side):
     # --- PHASE 0: GẬP TAY AN TOÀN & CHỜ LỆNH START TỪ MÀN HÌNH ---
     pre_init_seq = py_trees.composites.Sequence("Phase_0_Standby", memory=True)
     pre_init_seq.add_child(ArmSequenceBTNode("Tool_Arm_Home", ros_node, f"home_pose_{side}", duration=2.0))
-    pre_init_seq.add_child(MoveArmBehavior("Box_Arm_Home", ros_node, target_pose=[250.0, 0.0, 90.0, 0.0]))
+    pre_init_seq.add_child(MoveArmBehavior("Box_Arm_Home", ros_node, target_pose=[325.0, 0.0, 90.0, 50.0]))
     pre_init_seq.add_child(WaitForStartSignalBehavior("Wait_For_GUI_Strategy", ros_node))
     main.add_child(pre_init_seq)
 
@@ -82,11 +82,14 @@ def _build_main_mission(ros_node, lat, post_ramp_yaw, side):
 
     main.add_child(py_trees.decorators.FailureIsSuccess(
         "Ignore_Align_Exit",
-        WallAlignmentBehavior("Align_Cua_Cell", ros_node, window_degrees=20.0, goal_distance=0.8, timeout_sec=5.0),))
+        WallAlignmentBehavior("Align_Cua_Cell", ros_node, window_degrees=20.0, goal_distance=0.5, timeout_sec = 10.0),))
     main.add_child(py_trees.decorators.FailureIsSuccess(
         "Run_AI",
-        FollowTargetBehavior("Run_AI_ID1", ros_node, target_id=3.0, desired_distance_mm=250.0)))
+        FollowTargetBehavior("Run_AI_ID1", ros_node, target_id=5.0, desired_distance_mm=500.0)))
     
+    main.add_child(py_trees.decorators.FailureIsSuccess(
+        "Ignore_Align_Enter_Cell",
+        WallAlignmentBehavior("Align_after_AI", ros_node, window_degrees=20.0, goal_distance=0.1, timeout_sec = 10.0),))
 
     # --- Phase 3: Thoát khỏi sàn ---
     # exit_seq = py_trees.composites.Sequence("Chuoi_Thoat_Khoi_San", memory=True)

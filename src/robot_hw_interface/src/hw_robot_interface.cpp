@@ -499,9 +499,9 @@ hardware_interface::return_type Ak60RobotHwInterface::write(const rclcpp::Time &
       }
 
       if (servo_id >= 1 && servo_id <= 6) {
-        raw_cmd = std::clamp(raw_cmd, 125.0, 875.0);
+        raw_cmd = std::clamp(raw_cmd, 110.0, 890.0);
       } else if (servo_id == 7) { 
-        raw_cmd = std::clamp(raw_cmd, 350.0, 875.0);
+        raw_cmd = std::clamp(raw_cmd, 340.0, 875.0);
       } else if (servo_id == 8) {
         raw_cmd = std::clamp(raw_cmd, 125.0, 875.0);
       }

@@ -68,10 +68,10 @@ def main(args=None):
     
     # Thiết lập bộ đọc tham số từ Terminal
     parser = argparse.ArgumentParser(description='Tool test nhanh AI Tracking Client')
-    parser.add_argument('-i', '--id', type=float, default=6.0, 
+    parser.add_argument('-i', '--id', type=float, default=5.0, 
                         help='ID của vật thể cần bám (Mặc định: 0.0 - Người)')
-    parser.add_argument('-d', '--dist', type=float, default=360.0, 
-                        help='Khoảng cách mong muốn (mm) (Mặc định: 500.0)')
+    parser.add_argument('-d', '--dist', type=float, default=325.0, 
+                        help='Khoảng cách mong muốn (mm) (Mặc định: 325.0)')
     
     # Tách tham số của tool ra khỏi tham số mặc định của ROS 2
     parsed_args, ros_args = parser.parse_known_args()

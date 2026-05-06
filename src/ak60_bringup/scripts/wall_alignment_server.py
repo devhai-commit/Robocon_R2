@@ -51,7 +51,7 @@ class WallAlignmentServer(Node):
         # Thông số P-Controller
         self.kp_angular = 2.5
         self.kp_linear = 1.5
-        self.tolerance_deg = 0.5 
+        self.tolerance_deg = 1.5 
         self.tolerance_m = 0.01  
 
         self.lidar_yaw_offset_deg = 90.0 
@@ -248,9 +248,10 @@ def main(args=None):
     try:
         executor.spin()
     except KeyboardInterrupt:
-        pass
+        if rclpy.ok():
+            node.get_logger().info("Đang tắt Node, phanh xe an toàn...")
+            node.stop_robot()
     finally:
-        node.stop_robot()
         node.destroy_node()
         rclpy.shutdown()
 

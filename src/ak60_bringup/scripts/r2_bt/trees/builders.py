@@ -86,14 +86,14 @@ def build_move_subtree(ros_node):
         "Ignore_Align_1",
         py_trees.decorators.Timeout(
             "Align_1_Timeout",
-            WallAlignmentBehavior("Align_Before_Vision", ros_node, window_degrees=20.0, goal_distance=0.3),
+            WallAlignmentBehavior("Align_Before_Vision", ros_node, window_degrees=20.0, goal_distance=0.4),
             duration=5.0,
         ),
     ))
 
     subtree.add_child(py_trees.decorators.FailureIsSuccess(
         "Run_AI",
-        FollowTargetBehavior("Run_AI_ID1", ros_node, target_id=5, desired_distance_mm=250.0),
+        FollowTargetBehavior("Run_AI_ID1", ros_node, target_id=5, desired_distance_mm=280.0),
     ))
 
     box_selector = py_trees.composites.Selector("Box_Logic", memory=False)

@@ -25,6 +25,7 @@ def generate_launch_description():
     pkg_description = get_package_share_directory('ak60_description')
     pkg_control     = get_package_share_directory('ak60_robot_driver_control')
     pkg_bringup     = get_package_share_directory('ak60_bringup')
+    pkg_ydlidar     = get_package_share_directory('ydlidar_ros2_driver')
     
     # [THÊM MỚI] Đường dẫn package của RealSense
     pkg_realsense   = get_package_share_directory('realsense2_camera')
@@ -61,6 +62,16 @@ def generate_launch_description():
         output='screen', parameters=[ekf_file]
     )
 
+    lidar_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(
+                pkg_ydlidar, 
+                'launch', 
+                'ydlidar.py'  # Thay bằng 'ydlidar_launch.py' nếu file của bạn tên như vậy
+            )
+        )
+    )
+
     # ==========================================
     # [THÊM MỚI] HỆ THỐNG THỊ GIÁC (VISION)
     # ==========================================
@@ -74,16 +85,6 @@ def generate_launch_description():
             'initial_reset': 'true'
         }.items()
     )
-
-    # 2. Khởi chạy Action Server bám mục tiêu (YOLO + PID)
-    # Lưu ý: Mình đang giả định file này nằm trong thư mục scripts của package ak60_bringup.
-    # Nếu bạn để ở package khác, hãy đổi lại tên 'package=' cho đúng nhé.
-    # tracking_server_node = Node(
-    #     package='ak60_bringup',
-    #     executable='tracking_server.py',
-    #     name='tracking_server',
-    #     output='screen'
-    # )
 
     # ==========================================
     # ACTION SERVERS (cần chạy trước BT)
@@ -133,7 +134,7 @@ def generate_launch_description():
         field_color_arg,
 
         # 1. Bật URDF, Cảm biến, CAN/Serial, EKF ngay từ đầu
-        rsp_node, imu_node, can_node, steer_node, ekf_node, realsense_launch,
+        rsp_node, imu_node, can_node, steer_node, ekf_node, realsense_launch, lidar_launch,
 
         # 2. Bật Controller Manager sau 1 giây
         TimerAction(period=1.0, actions=[controller_manager]),
