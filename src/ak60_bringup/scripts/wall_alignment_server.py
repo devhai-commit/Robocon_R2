@@ -15,7 +15,6 @@ import tf_transformations
 import math
 import time
 
-# Nhớ thay thế 'ak60_bringup' bằng tên package của bạn nếu cần
 from ak60_bringup.action import WallAlignment
 
 class WallAlignmentServer(Node):
@@ -50,12 +49,12 @@ class WallAlignmentServer(Node):
         self.current_yaw = 0.0
         
         # Thông số P-Controller
-        self.kp_angular = 2.0
+        self.kp_angular = 2.5
         self.kp_linear = 1.5
-        self.tolerance_deg = 0.5 # Dừng xoay nếu lệch < 0.5 độ
-        self.tolerance_m = 0.01  # Dừng tiến nếu lệch < 1 cm
+        self.tolerance_deg = 0.5 
+        self.tolerance_m = 0.01  
 
-        self.lidar_yaw_offset_deg = 90.0 # Bù góc xoay lidar khi lắp
+        self.lidar_yaw_offset_deg = 90.0 
 
         self.get_logger().info('Action Server [Align -> Snap Yaw -> Approach] Đã sẵn sàng!')
 
@@ -70,8 +69,6 @@ class WallAlignmentServer(Node):
 
     def get_wall_state(self, scan_msg, window_rad):
         valid_points = []
-        
-        # Đổi góc offset từ độ sang radian
         offset_rad = math.radians(self.lidar_yaw_offset_deg)
 
         for i, r in enumerate(scan_msg.ranges):
@@ -132,92 +129,113 @@ class WallAlignmentServer(Node):
         goal_dist = goal_handle.request.goal_distance
         feedback_msg = WallAlignment.Feedback()
         cmd = Twist()
+        
+        # [TỐI ƯU 1]: Sử dụng đối tượng Rate của ROS 2 thay vì time.sleep để không block luồng
+        loop_rate = self.create_rate(20) # Chạy ở tần số 20Hz (0.05s)
 
-        while self.latest_scan is None:
-            time.sleep(0.1)
-
-        # ==========================================
-        # PHASE 1: XOAY VUÔNG GÓC (ALIGNING)
-        # ==========================================
-        self.get_logger().info('PHASE 1: Đang xoay vuông góc với tường...')
-        while rclpy.ok():
+        # [TỐI ƯU 2]: Thêm rclpy.ok() vào vòng lặp chờ Lidar để tránh bị kẹt cứng nếu Lidar rớt
+        while self.latest_scan is None and rclpy.ok():
             if goal_handle.is_cancel_requested:
-                self.stop_robot()
                 goal_handle.canceled()
                 return WallAlignment.Result()
+            time.sleep(0.1)
+            
+        if not rclpy.ok():
+            return WallAlignment.Result()
 
-            dev_deg, current_dist = self.get_wall_state(self.latest_scan, window_rad)
-            if dev_deg is None: 
-                self.get_logger().warn('Cảnh báo: Không tìm thấy đủ 5 điểm Laser trước mặt!')
-                time.sleep(0.5)
-                continue
-
-            feedback_msg.current_phase = "ALIGNING"
-            feedback_msg.current_deviation = dev_deg
-            goal_handle.publish_feedback(feedback_msg)
-
-            if abs(dev_deg) < self.tolerance_deg:
-                self.stop_robot()
-                time.sleep(0.5) # Đợi robot dừng hẳn dao động
-                break
-
-            cmd.angular.z = -self.kp_angular * math.radians(dev_deg)
-            cmd.angular.z = max(min(cmd.angular.z, 0.3), -0.3) 
-            self.cmd_pub.publish(cmd)
-            time.sleep(0.05)
-
-        # ==========================================
-        # PHASE 2: CHỐT GÓC YAW (SNAPPING YAW)
-        # ==========================================
-        feedback_msg.current_phase = "SNAPPING_YAW"
-        goal_handle.publish_feedback(feedback_msg)
-        
-        self.snap_yaw_to_nearest_orthogonal()
-        
-        # Đợi 0.5s để bộ lọc EKF cập nhật ma trận hiệp phương sai mới
-        time.sleep(0.5) 
-
-        # ==========================================
-        # PHASE 3: TIẾN ÁP SÁT TƯỜNG (CHỈ CHẠY NẾU GOAL_DISTANCE > 0)
-        # ==========================================
-        if goal_dist > 0.001:  # Dùng > 0.001 để tránh sai số float
-            self.get_logger().info(f'PHASE 3: Đang tiến vào khoảng cách mục tiêu {goal_dist}m...')
+        try:
+            # ==========================================
+            # PHASE 1: XOAY VUÔNG GÓC (ALIGNING)
+            # ==========================================
+            self.get_logger().info('PHASE 1: Đang xoay vuông góc với tường...')
             while rclpy.ok():
                 if goal_handle.is_cancel_requested:
-                    self.stop_robot()
                     goal_handle.canceled()
                     return WallAlignment.Result()
 
                 dev_deg, current_dist = self.get_wall_state(self.latest_scan, window_rad)
-                if current_dist is None: continue
+                if dev_deg is None: 
+                    self.get_logger().warn('Cảnh báo: Không tìm thấy đủ 5 điểm Laser trước mặt!', throttle_duration_sec=1.0)
+                    loop_rate.sleep()
+                    continue
 
-                error_dist = current_dist - goal_dist
-
-                feedback_msg.current_phase = "APPROACHING"
-                feedback_msg.current_distance = current_dist
+                feedback_msg.current_phase = "ALIGNING"
+                feedback_msg.current_deviation = dev_deg
                 goal_handle.publish_feedback(feedback_msg)
 
-                if abs(error_dist) < self.tolerance_m:
+                if abs(dev_deg) < self.tolerance_deg:
                     self.stop_robot()
+                    time.sleep(0.5) # Chờ dao động cơ khí triệt tiêu
                     break
 
-                cmd.angular.z = 0.0 # KHÓA CỨNG TRỤC QUAY NHỜ EKF ĐÃ CHUẨN
-                cmd.linear.x = self.kp_linear * error_dist
-                cmd.linear.x = max(min(cmd.linear.x, 0.2), -0.2)
+                cmd.angular.z = -self.kp_angular * math.radians(dev_deg)
+                cmd.angular.z = max(min(cmd.angular.z, 0.1), -0.1) 
                 self.cmd_pub.publish(cmd)
-                time.sleep(0.05)
-        else:
-            # Bỏ qua tiến tới nếu goal_distance = 0
-            self.get_logger().info('PHASE 3: Bỏ qua bước tiến (Goal distance = 0).')
+                
+                loop_rate.sleep() # Thay thế time.sleep(0.05)
 
-        # Hoàn thành
-        goal_handle.succeed()
-        result = WallAlignment.Result()
-        result.success = True
-        result.final_deviation, result.final_distance = self.get_wall_state(self.latest_scan, window_rad)
-        
-        self.get_logger().info(f'HOÀN THÀNH TOÀN BỘ! Cách tường: {result.final_distance:.3f}m | Lệch: {result.final_deviation:.2f}°')
-        return result
+            # ==========================================
+            # PHASE 2: CHỐT GÓC YAW (SNAPPING YAW)
+            # ==========================================
+            feedback_msg.current_phase = "SNAPPING_YAW"
+            goal_handle.publish_feedback(feedback_msg)
+            
+            self.snap_yaw_to_nearest_orthogonal()
+            time.sleep(0.5) # Đợi 0.5s để EKF cập nhật
+
+            # ==========================================
+            # PHASE 3: TIẾN ÁP SÁT TƯỜNG (BỎ QUA NẾU = 0)
+            # ==========================================
+            if goal_dist > 0.001:  
+                self.get_logger().info(f'PHASE 3: Đang tiến vào khoảng cách mục tiêu {goal_dist}m...')
+                while rclpy.ok():
+                    if goal_handle.is_cancel_requested:
+                        goal_handle.canceled()
+                        return WallAlignment.Result()
+
+                    dev_deg, current_dist = self.get_wall_state(self.latest_scan, window_rad)
+                    if current_dist is None: 
+                        loop_rate.sleep()
+                        continue
+
+                    error_dist = current_dist - goal_dist
+
+                    feedback_msg.current_phase = "APPROACHING"
+                    feedback_msg.current_distance = current_dist
+                    goal_handle.publish_feedback(feedback_msg)
+
+                    if abs(error_dist) < self.tolerance_m:
+                        self.stop_robot()
+                        break
+
+                    cmd.angular.z = 0.0 
+                    cmd.linear.x = self.kp_linear * error_dist
+                    cmd.linear.x = max(min(cmd.linear.x, 0.2), -0.2)
+                    self.cmd_pub.publish(cmd)
+                    
+                    loop_rate.sleep() # Thay thế time.sleep(0.05)
+            else:
+                self.get_logger().info('PHASE 3: Bỏ qua bước tiến (Goal distance = 0).')
+
+            # Hoàn thành
+            goal_handle.succeed()
+            result = WallAlignment.Result()
+            result.success = True
+            result.final_deviation, result.final_distance = self.get_wall_state(self.latest_scan, window_rad)
+            
+            self.get_logger().info(f'HOÀN THÀNH TOÀN BỘ! Cách tường: {result.final_distance:.3f}m | Lệch: {result.final_deviation:.2f}°')
+            return result
+
+        except Exception as e:
+            self.get_logger().error(f'Lỗi đột xuất trong quá trình chạy: {e}')
+            goal_handle.abort()
+            result = WallAlignment.Result()
+            result.success = False
+            return result
+            
+        finally:
+            # [TỐI ƯU 3]: Bùa hộ mệnh tuyệt đối - Bất kể vòng lặp kết thúc do Cancel, Crash hay Hoàn thành, xe PHẢI PHANH LẠI.
+            self.stop_robot()
 
     def stop_robot(self):
         self.cmd_pub.publish(Twist())
@@ -230,11 +248,11 @@ def main(args=None):
     try:
         executor.spin()
     except KeyboardInterrupt:
-        node.stop_robot()
+        pass
     finally:
+        node.stop_robot()
         node.destroy_node()
         rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
-    

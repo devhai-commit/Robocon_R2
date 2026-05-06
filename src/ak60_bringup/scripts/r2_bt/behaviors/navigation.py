@@ -75,7 +75,9 @@ class TurnToTargetCellBehavior(py_trees.behaviour.Behaviour):
         super().__init__(name)
         self.ros_node = ros_node
         self.client = ActionClient(self.ros_node, NavigateToPose, 'navigate_to_pose')
-        self.blackboard = py_trees.blackboard.Blackboard()
+        self.blackboard = self.attach_blackboard_client(name=name)
+        self.blackboard.register_key(key="robot_pos", access=py_trees.common.Access.READ)
+        self.blackboard.register_key(key="target_cell", access=py_trees.common.Access.READ)
         self.current_pose = None
         self.goal_sent = False
         self.target_yaw = None
@@ -90,9 +92,15 @@ class TurnToTargetCellBehavior(py_trees.behaviour.Behaviour):
     def initialise(self):
         self.goal_future = self.result_future = self.goal_handle = None
         self.goal_sent = False
-        
-        rp = self.blackboard.get("robot_pos")
-        tc = self.blackboard.get("target_cell")
+
+        try:
+            rp = self.blackboard.robot_pos
+        except KeyError:
+            rp = None
+        try:
+            tc = self.blackboard.target_cell
+        except KeyError:
+            tc = None
         if not rp or not tc:
             self.target_yaw = None
             return
@@ -100,10 +108,10 @@ class TurnToTargetCellBehavior(py_trees.behaviour.Behaviour):
         curr_c, curr_r = rp
         target_c, target_r = tc
         
-        if target_c > curr_c:   default_yaw = 0.0
-        elif target_c < curr_c: default_yaw = 180.0
-        elif target_r > curr_r: default_yaw = 90.0
-        elif target_r < curr_r: default_yaw = -90.0
+        if target_c > curr_c:   default_yaw = 90.0
+        elif target_c < curr_c: default_yaw = -90.0
+        elif target_r > curr_r: default_yaw = 0.0
+        elif target_r < curr_r: default_yaw = 180.0
         else:                   default_yaw = 0.0
         self.target_yaw = 0.0 if (target_c, target_r) in [(2, 1), (1, 4), (3, 4)] else default_yaw
 
@@ -143,7 +151,11 @@ class MoveRelativeOdomBehavior(py_trees.behaviour.Behaviour):
         self.climb_dist = float(climb_dist)
         self.flat_dist = float(flat_dist)
         self.client = ActionClient(self.ros_node, NavigateToPose, 'navigate_to_pose')
-        self.blackboard = py_trees.blackboard.Blackboard()
+        self.blackboard = self.attach_blackboard_client(name=name)
+        self.blackboard.register_key(key="target_cell", access=py_trees.common.Access.READ)
+        self.blackboard.register_key(key="robot_pos", access=py_trees.common.Access.WRITE)
+        self.blackboard.register_key(key="visit_path", access=py_trees.common.Access.WRITE)
+        self.blackboard.register_key(key="just_climbed", access=py_trees.common.Access.WRITE)
         self.current_pose = None
         self.goal_sent = False
         self.odom_sub = self.ros_node.create_subscription(Odometry, odom_topic, self.odom_callback, 10)
@@ -154,6 +166,12 @@ class MoveRelativeOdomBehavior(py_trees.behaviour.Behaviour):
         siny_cosp = 2 * (q.w * q.z + q.x * q.y)
         cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
         return math.atan2(siny_cosp, cosy_cosp)
+
+    def _bb_get(self, key, default=None):
+        try:
+            return self.blackboard.get(key)
+        except KeyError:
+            return default
 
     def euler_to_quaternion(self, yaw): return [0.0, 0.0, math.sin(yaw / 2), math.cos(yaw / 2)]
 
@@ -167,30 +185,35 @@ class MoveRelativeOdomBehavior(py_trees.behaviour.Behaviour):
         if not self.goal_sent:
             if self.current_pose is None: return py_trees.common.Status.RUNNING
             
-            rp = self.blackboard.get("robot_pos")
-            tc = self.blackboard.get("target_cell")
+            rp = self._bb_get("robot_pos")
+            tc = self._bb_get("target_cell")
             curr_c, curr_r = rp if rp else (2, 0)
             target_c, target_r = tc if tc else (2, 1)
-            
+
             curr_x = self.current_pose.position.x
             curr_y = self.current_pose.position.y
             curr_yaw = self.get_yaw(self.current_pose.orientation)
+            
             dc = target_c - curr_c
             dr = target_r - curr_r
             if dc == 0 and dr == 0: return py_trees.common.Status.SUCCESS
-            
-            path_yaw = math.atan2(dr, dc)
-            just_climbed = self.blackboard.get("just_climbed")
+
+            just_climbed = self._bb_get("just_climbed")
             dist = self.climb_dist if just_climbed else self.flat_dist
             
+            # [FIX LỖI ĐI NGANG]: Sử dụng trực tiếp curr_yaw thay vì tính path_yaw từ sa bàn
+            # Điều này đảm bảo xe luôn tiến thẳng tới trước mặt (relative X) bất kể sa bàn bị lệch
             goal_msg = NavigateToPose.Goal()
             goal_msg.pose.header.frame_id = 'odom'
             goal_msg.pose.header.stamp = self.ros_node.get_clock().now().to_msg()
-            goal_msg.pose.pose.position.x = curr_x + dist * math.cos(path_yaw)
-            goal_msg.pose.pose.position.y = curr_y + dist * math.sin(path_yaw)
+            
+            goal_msg.pose.pose.position.x = curr_x + dist * math.cos(curr_yaw)
+            goal_msg.pose.pose.position.y = curr_y + dist * math.sin(curr_yaw)
+            
             q = self.euler_to_quaternion(curr_yaw)
             goal_msg.pose.pose.orientation.z = q[2]
             goal_msg.pose.pose.orientation.w = q[3]
+            
             self.goal_future = self.client.send_goal_async(goal_msg)
             self.goal_sent = True
             return py_trees.common.Status.RUNNING
@@ -203,16 +226,16 @@ class MoveRelativeOdomBehavior(py_trees.behaviour.Behaviour):
         if not self.result_future.done(): return py_trees.common.Status.RUNNING
         
         if self.result_future.result().status == GoalStatus.STATUS_SUCCEEDED:
-            tc = self.blackboard.get("target_cell")
-            self.blackboard.set("robot_pos", tc)
-            
-            vp = self.blackboard.get("visit_path") or []
+            tc = self._bb_get("target_cell")
+            self.blackboard.robot_pos = tc
+
+            vp = self._bb_get("visit_path") or []
             if vp and len(vp) >= 2 and vp[-2] == tc:
                 vp.pop()
             else:
                 vp.append(tc)
-            self.blackboard.set("visit_path", vp)
-            self.blackboard.set("just_climbed", False)
+            self.blackboard.visit_path = vp
+            self.blackboard.just_climbed = False
             return py_trees.common.Status.SUCCESS
         return py_trees.common.Status.FAILURE
 

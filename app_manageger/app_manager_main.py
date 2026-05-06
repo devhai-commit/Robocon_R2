@@ -25,7 +25,7 @@ def create_tree(ros_node):
     # --- PHASE 0: GẬP TAY AN TOÀN & CHỜ LỆNH START TỪ MÀN HÌNH ---
     pre_init_seq = py_trees.composites.Sequence("Phase_0_Standby", memory=True)
     pre_init_seq.add_child(ArmSequenceBTNode("Tool_Arm_Home", ros_node, "home_pose_right", duration=2.0))
-    pre_init_seq.add_child(MoveArmBehavior("Box_Arm_Home", ros_node, target_pose=[230.0, 0.0, 90.0, 0.0]))
+    pre_init_seq.add_child(MoveArmBehavior("Box_Arm_Home", ros_node, target_pose=[250.0, 0.0, 90.0, 0.0]))
     pre_init_seq.add_child(WaitForStartSignalBehavior("Wait_For_GUI_Strategy", ros_node))
     root.add_child(pre_init_seq)
 
@@ -67,7 +67,7 @@ def create_tree(ros_node):
     # place_boxes_seq.add_child(py_trees.decorators.FailureIsSuccess("Ep sat 0.15m (1)", WallAlignmentBehavior("Ép sát 0.15m", ros_node, 60.0, 0.15)))
     # place_boxes_seq.add_child(MoveArmBehavior("Mo tay gap 1", ros_node, [400.0, 0.0, 90.0, 45.0]))
     # place_boxes_seq.add_child(GoToRelativePoseBehavior("Lui 0.5m", ros_node, -0.5, 0.0, -90.0))
-    # place_boxes_seq.add_child(MoveArmBehavior("Thu tay ve Home (1)", ros_node, [230.0, 0.0, 90.0, 0.0]))
+    # place_boxes_seq.add_child(MoveArmBehavior("Thu tay ve Home (1)", ros_node, [250.0, 0.0, 90.0, 0.0]))
     # place_boxes_seq.add_child(GoToRelativePoseBehavior("Sang phai 0.54m", ros_node, 0.0, -0.54, -90.0))
     # place_boxes_seq.add_child(build_place_sequence_2(ros_node))
     # place_boxes_seq.add_child(py_trees.decorators.FailureIsSuccess("Ep sat 0.15m (2)", WallAlignmentBehavior("Ép sát 0.15m (2)", ros_node, 60.0, 0.15)))

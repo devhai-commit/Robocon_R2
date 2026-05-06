@@ -49,15 +49,6 @@ _PICK_PRESETS = {
         "lift":      [ 300.0,   0.0,   0.0, -28.0],
         "retract":   [ 300.0,   0.0,   0.0,  70.0],
     },
-
-    'same': { # BỔ SUNG: Robot và hộp Cùng Mặt Phẳng
-        "home":      [ 150.0,  -5.0,   0.0,  70.0],
-        "pre_grasp": [ 150.0,  60.0,   0.0,  70.0],
-        "extend":    [ 150.0,  60.0,   0.0,  70.0],
-        "close":     [ 150.0,  60.0,   0.0, -28.0],
-        "lift":      [ 150.0,   0.0,   0.0, -28.0],
-        "retract":   [ 150.0,   0.0,   0.0,  70.0],
-    }
 }
 
 _PICK_STEPS = [
@@ -75,7 +66,6 @@ def build_pick_and_place_sequence(ros_node, mode='low'):
     """Chuỗi gắp hộp KFS bằng MoveArm (4-DOF).
     mode='low'  — robot ở bậc thấp hơn, gắp lên.
     mode='high' — robot ở bậc cao hơn, gắp xuống.
-    mode='same' - Robot và hộp Cùng Mặt Phẳng
     """
     presets = _PICK_PRESETS[mode]
     seq = py_trees.composites.Sequence(name=f"Chuoi_Gap_Hop_{mode.upper()}", memory=True)
@@ -86,51 +76,35 @@ def build_pick_and_place_sequence(ros_node, mode='low'):
     return seq
 
 
-def build_place_sequence_1(ros_node):
-    seq = py_trees.composites.Sequence(name="Place_Sequence_1", memory=True)
-    seq.add_child(MoveArmBehavior("Arm: Dua hop 1 ra truoc", ros_node, target_pose=[400.0, 0.0, 90.0, 0.0]))
-    seq.add_child(RosWaitBehavior("Wait", ros_node, delay_sec=1.0))
-    return seq
-
-def build_place_sequence_2(ros_node):
-    seq = py_trees.composites.Sequence(name="Place_Sequence_2", memory=True)
-    seq.add_child(MoveArmBehavior("Arm: Dua hop 2 ra truoc", ros_node, target_pose=[400.0, 0.0, 90.0, 0.0]))
-    seq.add_child(RosWaitBehavior("Wait", ros_node, delay_sec=1.0))
-    return seq
-
-
 def build_move_subtree(ros_node):
+    """Subtree xử lý một bước vào ô lưới: quay hướng → vision → leo/di chuyển."""
     subtree = py_trees.composites.Sequence("Process_And_Enter_Cell", memory=True)
+
     subtree.add_child(TurnToTargetCellBehavior("Turn_To_Face_Cell", ros_node))
 
     subtree.add_child(py_trees.decorators.FailureIsSuccess(
         "Ignore_Align_1",
-        WallAlignmentBehavior("Align_Before_Vision", ros_node, window_degrees=20.0, goal_distance=0.3),
+        py_trees.decorators.Timeout(
+            "Align_1_Timeout",
+            WallAlignmentBehavior("Align_Before_Vision", ros_node, window_degrees=20.0, goal_distance=0.3),
+            duration=5.0,
+        ),
     ))
-# ============================ them config target ID ============================================
+
     subtree.add_child(py_trees.decorators.FailureIsSuccess(
         "Run_AI",
-        FollowTargetBehavior("Run_AI_ID1", ros_node, target_id=1, desired_distance_mm=250.0),
+        FollowTargetBehavior("Run_AI_ID1", ros_node, target_id=5, desired_distance_mm=250.0),
     ))
-# ==================================================================================================
+
     box_selector = py_trees.composites.Selector("Box_Logic", memory=False)
 
-    # Lập logic chẻ nhánh 3 Case cao độ cho Hộp REAL
+    # Chọn preset gắp theo elevation: robot ở thấp → gắp lên (low), robot ở cao → gắp xuống (high)
     pick_selector = py_trees.composites.Selector("Pick_By_Elevation", memory=False)
-    
     pick_low_seq = py_trees.composites.Sequence("Pick_From_Low", memory=True)
     pick_low_seq.add_child(IsClimbingUpCondition("Is_Going_Up", ros_node))
     pick_low_seq.add_child(build_pick_and_place_sequence(ros_node, mode='low'))
-    
-    # Check nếu độ cao KHÔNG thay đổi -> Dùng preset 'same'
-    pick_high_seq = py_trees.composites.Sequence("Pick_Same_Level", memory=True)
-    pick_high_seq.add_child(py_trees.decorators.Inverter(
-        "Not_Change_Elevation", 
-        HasElevationChangeCondition("Check_Elevation_Change", ros_node)
-    ))
-    pick_high_seq.add_child(build_pick_and_place_sequence(ros_node, mode='high'))
-    
-    pick_selector.add_children([pick_low_seq, pick_high_seq, build_pick_and_place_sequence(ros_node, mode='high')])
+    pick_selector.add_child(pick_low_seq)
+    pick_selector.add_child(build_pick_and_place_sequence(ros_node, mode='high'))
 
     real_seq = py_trees.composites.Sequence("Hunt_REAL", memory=True)
     real_seq.add_child(CheckBlackboardValue("Is_Real?", "latest_box_detection", "REAL", operator.eq))
@@ -143,9 +117,7 @@ def build_move_subtree(ros_node):
     fake_seq.add_child(MarkAsObstacleAction("Mark_Obstacle"))
     fake_seq.add_child(py_trees.behaviours.Failure("Block_Route"))
 
-    # [FIX CỰC KỲ QUAN TRỌNG]: Đã bọc thêm node Check EMPTY để không đâm bậy!
     empty_seq = py_trees.composites.Sequence("Hunt_EMPTY", memory=True)
-    empty_seq.add_child(CheckBlackboardValue("Is_Empty?", "latest_box_detection", "EMPTY", operator.eq))
     empty_seq.add_child(MarkAsVisitedAction("Mark_Accessible_Empty"))
 
     box_selector.add_children([real_seq, fake_seq, empty_seq])

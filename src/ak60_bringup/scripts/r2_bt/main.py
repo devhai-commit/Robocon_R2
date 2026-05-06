@@ -5,7 +5,7 @@ import rclpy
 from rclpy.node import Node
 import py_trees
 import py_trees_ros
-from r2_bt.trees.test_mission import create_tree
+from r2_bt.trees.mission import create_tree
 from r2_bt.config import FIELD_CONFIGS
 
 
@@ -43,7 +43,7 @@ def main(args=None):
     executor.add_node(node)
 
     tree_root      = create_tree(node, field_color=field_color)
-    behaviour_tree = py_trees_ros.trees.BehaviourTree(tree_root)
+    behaviour_tree = py_trees_ros.trees.BehaviourTree(root=tree_root)
 
     try:
         behaviour_tree.setup(timeout=30.0, node=node)
@@ -57,6 +57,8 @@ def main(args=None):
         node.destroy_node()
         rclpy.shutdown()
         return
+
+    behaviour_tree.tick_tock(0.1)
 
     executor_thread = threading.Thread(target=executor.spin, daemon=True)
     executor_thread.start()

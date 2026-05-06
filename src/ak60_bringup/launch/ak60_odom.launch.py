@@ -133,13 +133,13 @@ def generate_launch_description():
         field_color_arg,
 
         # 1. Bật URDF, Cảm biến, CAN/Serial, EKF ngay từ đầu
-        rsp_node, imu_node, can_node, steer_node, ekf_node,
+        rsp_node, imu_node, can_node, steer_node, ekf_node, realsense_launch,
 
         # 2. Bật Controller Manager sau 1 giây
         TimerAction(period=1.0, actions=[controller_manager]),
 
         # 3. Bật tất cả Action Servers sau 2 giây
-        TimerAction(period=2.0, actions=[
+        TimerAction(period=1.0, actions=[
             odom_nav_node,
             step_climb_node,
             arm_action_node,
@@ -153,6 +153,6 @@ def generate_launch_description():
         delay_bogie_after_jsb,
         delay_arm_after_bogie,
 
-        # 5. Bật Behavior Tree App Manager sau 8 giây để đảm bảo tất cả Action Server đã sẵn sàng
-        TimerAction(period=8.0, actions=[app_manager_node]),
+        # 5. Bật Behavior Tree App Manager sau 20 giây để đảm bảo tất cả Action Server đã sẵn sàng
+        TimerAction(period=20.0, actions=[app_manager_node]),
     ])
