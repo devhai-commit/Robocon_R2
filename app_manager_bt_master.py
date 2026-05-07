@@ -403,7 +403,7 @@ class FollowTargetBehavior(py_trees.behaviour.Behaviour):
     def __init__(self, name, ros_node, target_id, desired_distance_mm):
         super().__init__(name)
         self.ros_node = ros_node
-        self.target_id = float(target_id)
+        self.target_id = target_id
         self.desired_distance_mm = float(desired_distance_mm)
         self.client = ActionClient(self.ros_node, FollowTarget, 'follow_target')
         self.goal_handle = self.goal_future = self.result_future = None

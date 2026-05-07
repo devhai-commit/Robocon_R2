@@ -58,8 +58,9 @@ def main(args=None):
         rclpy.shutdown()
         return
 
-    behaviour_tree.tick_tock(0.1)
-
+    # KHÔNG dùng behaviour_tree.tick_tock(...) cùng với bt_ticker_thread —
+    # hai nguồn tick song song sẽ mutate deque tick_interval_history khi
+    # statistics handler đang iterate, gây "deque mutated during iteration".
     executor_thread = threading.Thread(target=executor.spin, daemon=True)
     executor_thread.start()
 

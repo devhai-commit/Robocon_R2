@@ -1,5 +1,5 @@
 # Goal
-float32 target_id
+string target_id
 float32 desired_distance_mm
 ---
 # Result

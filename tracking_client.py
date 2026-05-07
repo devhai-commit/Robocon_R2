@@ -21,7 +21,7 @@ class TrackingClient(Node):
 
         # Tạo gói tin Goal
         goal_msg = FollowTarget.Goal()
-        goal_msg.target_id = float(target_id)
+        goal_msg.target_id = target_id
         goal_msg.desired_distance_mm = float(desired_distance_mm)
 
         self.get_logger().info(f'🚀 Bắt đầu gửi lệnh: Bám ID {target_id}, Cách {desired_distance_mm}mm...')

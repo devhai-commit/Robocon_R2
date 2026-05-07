@@ -144,7 +144,7 @@ def generate_launch_description():
             odom_nav_node,
             step_climb_node,
             arm_action_node,
-            esp32_arm_node,
+            # esp32_arm_node,
             wall_align_node,
             tracking_node,
         ]),

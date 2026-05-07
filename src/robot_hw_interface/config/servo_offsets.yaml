@@ -1,9 +1,9 @@
 # config/servo_offsets.yaml
-steer_1: 0.0
-steer_2: 0.0
+steer_1: 20.0
+steer_2: 10.0
 steer_3: 0.0
-steer_4: 30.0
-steer_5: 0.0
-steer_6: -20.0
+steer_4: 50.0
+steer_5: 20.0
+steer_6: -40.0
 arm_joint_2: 0.0
 arm_joint_3: 0.0

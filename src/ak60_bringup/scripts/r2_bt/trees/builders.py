@@ -93,7 +93,7 @@ def build_move_subtree(ros_node):
 
     subtree.add_child(py_trees.decorators.FailureIsSuccess(
         "Run_AI",
-        FollowTargetBehavior("Run_AI_ID1", ros_node, target_id=5, desired_distance_mm=280.0),
+        FollowTargetBehavior("Run_AI_ID1", ros_node, target_id="class5", desired_distance_mm=280.0),
     ))
 
     box_selector = py_trees.composites.Selector("Box_Logic", memory=False)

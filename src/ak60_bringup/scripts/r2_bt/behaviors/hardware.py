@@ -181,7 +181,7 @@ class FollowTargetBehavior(py_trees.behaviour.Behaviour):
     def __init__(self, name, ros_node, target_id, desired_distance_mm, timeout_sec=15.0):
         super().__init__(name)
         self.ros_node = ros_node
-        self.target_id = float(target_id)
+        self.target_id = target_id
         self.desired_distance_mm = float(desired_distance_mm)
         self.timeout_sec = float(timeout_sec)  # Bổ sung Timeout bảo vệ
         self.client = ActionClient(self.ros_node, FollowTarget, 'follow_target')
@@ -202,7 +202,7 @@ class FollowTargetBehavior(py_trees.behaviour.Behaviour):
         
         self.ros_node.get_logger().info(f"[{self.name}] 👁️ Tìm mục tiêu ID={self.target_id}...")
         goal_msg = FollowTarget.Goal()
-        goal_msg.target_id = float(self.target_id)
+        goal_msg.target_id = self.target_id
         goal_msg.desired_distance_mm = float(self.desired_distance_mm)
         self.goal_future = self.client.send_goal_async(goal_msg)
 

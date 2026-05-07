@@ -12,7 +12,7 @@ from r2_bt.behaviors.grid_logic import (
     DecideNextGridCellAction, IsAtExitCellCondition,
     CheckBlackboardValue, KeepRunningUntilSuccess, WaitForStartSignalBehavior,
 )
-from r2_bt.trees.builders import build_tool_assembly_sequence, build_move_subtree
+from r2_bt.trees.builders import build_tool_assembly_sequence, build_move_subtree, build_pick_and_place_sequence
 from r2_bt.config import FIELD_CONFIGS
 
 
@@ -56,13 +56,13 @@ def _build_topics_to_bb():
     return topics2bb
 
 
-def _build_main_mission(ros_node, lat, post_ramp_yaw, side):
+def _build_main_mission(ros_node, lat, post_ramp_yaw, side, ai_target_id):
     main = py_trees.composites.Sequence("Main_Mission", memory=True)
 
     # --- PHASE 0: GẬP TAY AN TOÀN & CHỜ LỆNH START TỪ MÀN HÌNH ---
     pre_init_seq = py_trees.composites.Sequence("Phase_0_Standby", memory=True)
-    pre_init_seq.add_child(ArmSequenceBTNode("Tool_Arm_Home", ros_node, f"home_pose_{side}", duration=2.0))
-    pre_init_seq.add_child(MoveArmBehavior("Box_Arm_Home", ros_node, target_pose=[325.0, 0.0, 90.0, 50.0]))
+    # pre_init_seq.add_child(ArmSequenceBTNode("Tool_Arm_Home", ros_node, f"home_pose_{side}", duration=2.0))
+    pre_init_seq.add_child(MoveArmBehavior("Box_Arm_Home", ros_node, target_pose=[325.0, 0.0, 0.0, 0.0]))
     pre_init_seq.add_child(WaitForStartSignalBehavior("Wait_For_GUI_Strategy", ros_node))
     main.add_child(pre_init_seq)
 
@@ -85,11 +85,13 @@ def _build_main_mission(ros_node, lat, post_ramp_yaw, side):
         WallAlignmentBehavior("Align_Cua_Cell", ros_node, window_degrees=20.0, goal_distance=0.5, timeout_sec = 10.0),))
     main.add_child(py_trees.decorators.FailureIsSuccess(
         "Run_AI",
-        FollowTargetBehavior("Run_AI_ID1", ros_node, target_id=5.0, desired_distance_mm=500.0)))
+        FollowTargetBehavior("Run_AI_ID1", ros_node, target_id="class5", desired_distance_mm=500.0)))
     
     main.add_child(py_trees.decorators.FailureIsSuccess(
         "Ignore_Align_Enter_Cell",
         WallAlignmentBehavior("Align_after_AI", ros_node, window_degrees=20.0, goal_distance=0.1, timeout_sec = 10.0),))
+
+    main.add_child(build_pick_and_place_sequence(ros_node, mode='high'))
 
     # --- Phase 3: Thoát khỏi sàn ---
     # exit_seq = py_trees.composites.Sequence("Chuoi_Thoat_Khoi_San", memory=True)
@@ -162,6 +164,9 @@ def create_tree(ros_node, field_color='red'):
     post_ramp_yaw = cfg['post_ramp_yaw'] # -90° red / +90° blue
     side          = cfg['tool_arm_side'] # 'left' hoặc 'right'
 
+    # AI target_id theo phia san: red → 4, blue → 5.
+    ai_target_id = "class4" if field_color == 'red' else "class5"
+
     _seed_blackboard()
 
     # Idiom Topics2BB: Parallel chạy song song nhánh subscribe ROS và nhánh logic chính.
@@ -175,7 +180,7 @@ def create_tree(ros_node, field_color='red'):
     )
 
     topics2bb = _build_topics_to_bb()
-    main_mission = _build_main_mission(ros_node, lat, post_ramp_yaw, side)
+    main_mission = _build_main_mission(ros_node, lat, post_ramp_yaw, side, ai_target_id)
 
     root.add_children([topics2bb, main_mission])
     root.policy = py_trees.common.ParallelPolicy.SuccessOnSelected(

@@ -83,7 +83,7 @@ class IntegratedTrackingServer(Node):
         self.cmd_pub.publish(Twist())
 
     def goal_callback(self, goal_request):
-        self.get_logger().info(f"Nhận Goal: Bám ID {int(goal_request.target_id)}, Cách {goal_request.desired_distance_mm}mm")
+        self.get_logger().info(f"Nhận Goal: Bám ID {goal_request.target_id}, Cách {goal_request.desired_distance_mm}mm")
         return GoalResponse.ACCEPT
 
     def cancel_callback(self, goal_handle):
@@ -92,8 +92,10 @@ class IntegratedTrackingServer(Node):
 
     def execute_callback(self, goal_handle):
         # [TỐI ƯU 3]: Toàn bộ biến trạng thái nay là biến cục bộ (Local), chống xung đột.
-        target_id = int(goal_handle.request.target_id)
+        target_id = goal_handle.request.target_id
         desired_distance_mm = goal_handle.request.desired_distance_mm
+        # target_id từ action là string label (ví dụ "class5"), trùng với value của model.names.
+        target_label = target_id
         
         success_frames = 0
         lost_frames = 0
@@ -137,32 +139,36 @@ class IntegratedTrackingServer(Node):
                     if self.enable_gui: annotated_frame = results[0].plot()
                     
                     target_found = False
-                    objects_in_roi = 0 
+                    objects_in_roi = 0
                     raw_center_x, raw_distance_mm = 0.0, 0.0
+                    fake_labels = []
 
                     for r in results:
                         for box in r.boxes:
-                            class_id = int(box.cls[0].cpu().numpy()) 
+                            class_id = int(box.cls[0].cpu().numpy())
+                            detected_label = self.model.names.get(class_id, f"id_{class_id}")
                             b = box.xyxy[0].cpu().numpy()
                             temp_center_x = (b[0] + b[2]) / 2.0
                             center_y = int((b[1] + b[3]) / 2.0)
-                            
+
                             temp_distance_mm = 0.0
                             with self.depth_lock:
                                 if self.latest_depth_img is not None:
                                     height, width = self.latest_depth_img.shape
                                     if 0 <= center_y < height and 0 <= int(temp_center_x) < width:
                                         temp_distance_mm = float(self.latest_depth_img[center_y, int(temp_center_x)])
-                            
+
                             error_x_temp = self.img_center_x - temp_center_x
                             if abs(error_x_temp) <= 200.0 and 0 < temp_distance_mm < 1200.0:
-                                objects_in_roi += 1 
-                                if class_id == target_id:
+                                objects_in_roi += 1
+                                if detected_label == target_label:
                                     raw_center_x = temp_center_x
                                     raw_distance_mm = temp_distance_mm
-                                    last_target_y = center_y 
+                                    last_target_y = center_y
                                     target_found = True
-                                    break 
+                                    break
+                                else:
+                                    fake_labels.append(detected_label)
                         if target_found: break
 
                     current_state = "empty"
@@ -177,6 +183,7 @@ class IntegratedTrackingServer(Node):
 
                     smooth_x = 0.0
                     if current_state == "real":
+                        self.get_logger().info(f"Nhan dien KFS REAL!")
                         lost_frames = 0
                         meas = np.array([[np.float32(raw_center_x)], [np.float32(raw_distance_mm)]])
 
@@ -195,7 +202,15 @@ class IntegratedTrackingServer(Node):
                     else:
                         lost_frames += 1
                         if lost_frames >= 10: 
-                            self.get_logger().error(f"❌ Abort Task! Trạng thái quét: {current_state.upper()}")
+                            if current_state == "fake" and fake_labels:
+                                seen = []
+                                for lbl in fake_labels:
+                                    if lbl not in seen:
+                                        seen.append(lbl)
+                                detected_str = ", ".join(seen)
+                                self.get_logger().error(f"❌ Abort Task! Trạng thái quét: FAKE | Cần: '{target_label}' | Đang nhận diện: [{detected_str}]")
+                            else:
+                                self.get_logger().error(f"❌ Abort Task! Mục tiêu: '{target_label}' | Trạng thái quét: {current_state.upper()}")
                             self.stop_robot()
                             result.success = False
                             result.message = current_state
@@ -253,7 +268,7 @@ class IntegratedTrackingServer(Node):
                     if distance_mm <= 0:
                         lost_frames += 1
                         if lost_frames >= 10: 
-                            self.get_logger().error("❌ Mất dữ liệu Depth quá 10 frames! ABORT ACTION...")
+                            self.get_logger().error(f"❌ Mất dữ liệu Depth quá 10 frames! ABORT ACTION... Mục tiêu: '{target_label}'")
                             self.stop_robot()
                             result.success = False
                             result.message = "depth_lost"
