@@ -242,6 +242,10 @@ class CheckBlackboardValue(py_trees.behaviour.Behaviour):
         val = _safe_get(self.blackboard, self.variable_name)
         if val is not None and self.op(val, self.expected_value):
             return py_trees.common.Status.SUCCESS
+        self.logger.debug(
+            f"[{self.name}] FAIL: blackboard['{self.variable_name}']={val!r} "
+            f"vs expected={self.expected_value!r}"
+        )
         return py_trees.common.Status.FAILURE
 
 
