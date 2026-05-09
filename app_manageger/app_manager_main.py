@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
+from rclpy import node
 from rclpy.node import Node
 import py_trees
 import py_trees_ros
@@ -16,28 +17,43 @@ from bt_sequences import *
 def create_tree(ros_node):
     root = py_trees.composites.Sequence("Main Mission", memory=True)
     
-    blackboard = py_trees.blackboard.Blackboard()
+    blackboard = py_trees.blackboard.Client(name="Main_Blackboard")
+    blackboard.register_key("real_box_count", access=py_trees.common.Access.WRITE)
+    blackboard.register_key("robot_pos", access=py_trees.common.Access.WRITE)
+    blackboard.register_key("visit_path", access=py_trees.common.Access.WRITE)
+    blackboard.register_key("grid_status", access=py_trees.common.Access.WRITE)
+
     blackboard.real_box_count = 0
-    blackboard.robot_pos = (2, 0) 
-    blackboard.visit_path = [blackboard.robot_pos] 
+    blackboard.robot_pos = (2, 0)
+    blackboard.visit_path = [blackboard.robot_pos]
     blackboard.grid_status = {(c, r): {'scanned': False, 'state': 'accessible', 'visited': False} for c in range(1, 4) for r in range(1, 5)}
+
+    print("Khởi tạo Blackboard với trạng thái ban đầu:")
+    print(f"  - real_box_count: {blackboard.real_box_count}")
+    print(f"  - robot_pos: {blackboard.robot_pos}")
+    print(f"  - visit_path: {blackboard.visit_path}")
+    print(f"  - grid_status: {blackboard.grid_status}")
 
     # --- PHASE 0: GẬP TAY AN TOÀN & CHỜ LỆNH START TỪ MÀN HÌNH ---
     pre_init_seq = py_trees.composites.Sequence("Phase_0_Standby", memory=True)
-    pre_init_seq.add_child(ArmSequenceBTNode("Tool_Arm_Home", ros_node, "home_pose_right", duration=2.0))
-    pre_init_seq.add_child(MoveArmBehavior("Box_Arm_Home", ros_node, target_pose=[250.0, 0.0, 90.0, 0.0]))
+    # pre_init_seq.add_child(ArmSequenceBTNode("Tool_Arm_Home", ros_node, "home_pose_right", duration=2.0))
+    # pre_init_seq.add_child(MoveArmBehavior("Box_Arm_Home", ros_node, target_pose=[250.0, 0.0, 90.0, 0.0]))
     pre_init_seq.add_child(WaitForStartSignalBehavior("Wait_For_GUI_Strategy", ros_node))
     root.add_child(pre_init_seq)
 
     # --- PHASE 1: LẤY DỤNG CỤ VÀ TIẾN RA CỬA LƯỚI ---
     init_seq = py_trees.composites.Sequence("Phase_1_Khoi_Dong", memory=True)
-    init_seq.add_child(GoToRelativePoseBehavior("Tien_Lay_Dung_Cu", ros_node, dx=0.3, dy=1.0, target_yaw_deg=0.0))
-    init_seq.add_child(build_tool_assembly_sequence_right(ros_node))
-    init_seq.add_child(GoToRelativePoseBehavior("Tien_Ra_Cua_Grid", ros_node, dx=1.6, dy=-2.5, target_yaw_deg=0.0))
-    init_seq.add_child(py_trees.behaviours.SetBlackboardVariable("Target=(2,1)", "target_cell", (2, 1), overwrite=True))
+    # init_seq.add_child(GoToRelativePoseBehavior("Tien_Lay_Dung_Cu", ros_node, dx=0.3, dy=1.0, target_yaw_deg=0.0))
+    # init_seq.add_child(build_tool_assembly_sequence_right(ros_node))
+    # init_seq.add_child(GoToRelativePoseBehavior("Tien_Ra_Cua_Grid", ros_node, dx=1.6, dy=-2.5, target_yaw_deg=0.0))
+    init_seq.add_child(py_trees.behaviours.SetBlackboardVariable(name= "Main_Blackboard", variable_name="target_cell", variable_value=(2, 1), overwrite=True))
     root.add_child(init_seq)
 
+    print("Đã xây dựng xong cây hành vi chính. Sẵn sàng thực thi nhiệm vụ!")
+
+    
     # # --- PHASE 3: THOÁT KHỎI SA BÀN ---
+
     # exit_sequence = py_trees.composites.Sequence("Chuoi_Thoat_Khoi_San", memory=True)
     # exit_sequence.add_child(GoToRelativePoseBehavior("Thoat: Tien 0.25m", ros_node, dx=0.25, dy=0.0, target_yaw_deg=0.0))
     # exit_sequence.add_child(ClimbStepBehavior("Thoat: Xuong bac v=0.1", ros_node, velocity=0.1))
@@ -60,7 +76,8 @@ def create_tree(ros_node):
     # exit_sequence.add_child(GoToRelativePoseBehavior("Thoat: Tien thang 4m", ros_node, dx=4.0, dy=0.0, target_yaw_deg=-90.0))
 
     # # --- PHASE 4: ĐẶT 2 HỘP LÊN CỘT SILO (13 BƯỚC) ---
-    # place_boxes_seq = py_trees.composites.Sequence("Chuoi_Dat_2_Hop", memory=True)
+
+    # place_boxes_seq = py_trees.compositebbs.Sequence("Chuoi_Dat_2_Hop", memory=True)
     # place_boxes_seq.add_child(py_trees.decorators.FailureIsSuccess("Align 1.5m", WallAlignmentBehavior("Align 1.5m", ros_node, 60.0, 1.5)))
     # place_boxes_seq.add_child(py_trees.decorators.FailureIsSuccess("AI Can Tam", FollowTargetBehavior("AI Căn Tâm (ID=1)", ros_node, 1, 400.0, "REAL")))
     # place_boxes_seq.add_child(build_place_sequence_1(ros_node))
@@ -76,6 +93,7 @@ def create_tree(ros_node):
     # place_boxes_seq.add_child(MoveArmBehavior("Thu tay ve Home (2)", ros_node, [230.0, 0.0, 90.0, 0.0]))
 
     # # --- PHASE 2: ĐIỀU HƯỚNG LƯỚI & GHÉP NỐI ---
+
     # mode_selector = py_trees.composites.Selector("Mode_Control", memory=False)
     
     # exit_check_seq = py_trees.composites.Sequence("Mode: EXIT_NOW", memory=True)
@@ -120,7 +138,11 @@ def bt_ticker_thread(node, tree, blackboard):
             tree.tick() 
             print("\n" + "="*50)
             print(py_trees.display.ascii_tree(tree.root, show_status=True)) 
-            time.sleep(0.5) 
+
+            print("-" * 20 + " BLACKBOARD " + "-" * 20)
+            print(py_trees.display.unicode_blackboard())
+
+            time.sleep(1.0) 
         except Exception as e:
             node.get_logger().error(f"Lỗi khi tick cây: {e}")
             time.sleep(1.0)
@@ -136,10 +158,13 @@ def main(args=None):
 
     executor = rclpy.executors.MultiThreadedExecutor()
     executor.add_node(node)
-    
-    blackboard = py_trees.blackboard.Blackboard()
+
+    snapshot_visitor = py_trees.visitors.DisplaySnapshotVisitor()
+    py_trees.display.render_blackboard_variables_terminal = True
+
     tree_root = create_tree(node)
     behaviour_tree = py_trees_ros.trees.BehaviourTree(tree_root)
+    behaviour_tree.add_visitor(snapshot_visitor)
 
     executor_thread = threading.Thread(target=executor.spin, daemon=True)
     executor_thread.start()
@@ -150,11 +175,14 @@ def main(args=None):
         behaviour_tree.setup(timeout=60.0, node=node)
         node.get_logger().info("✅ KẾT NỐI SERVER THÀNH CÔNG! Robot vào trạng thái chờ Lệnh GUI...")
 
-        bt_thread = threading.Thread(target=bt_ticker_thread, args=(node, behaviour_tree, blackboard))
+        bt_thread = threading.Thread(target=bt_ticker_thread, args=(node, behaviour_tree, py_trees.blackboard.Blackboard())) 
         bt_thread.daemon = True
         bt_thread.start()
 
-        while rclpy.ok(): time.sleep(1.0)
+        while rclpy.ok(): 
+            node.get_logger().debug("Robot đang chờ lệnh từ GUI... (Nhấn Ctrl+C để dừng)")
+
+            time.sleep(1.0)
             
     except KeyboardInterrupt:
         node.get_logger().warn('Dừng khẩn cấp do người dùng (Ctrl+C).')

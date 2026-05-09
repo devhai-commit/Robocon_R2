@@ -6,6 +6,8 @@ from nav2_msgs.action import NavigateToPose
 from nav_msgs.msg import Odometry
 from action_msgs.msg import GoalStatus
 
+from r2_bt.blackboard import bb
+
 class GoToRelativePoseBehavior(py_trees.behaviour.Behaviour):
     def __init__(self, name, ros_node, dx, dy, target_yaw_deg, odom_topic='/odometry/filtered'):
         super().__init__(name)
@@ -75,9 +77,6 @@ class TurnToTargetCellBehavior(py_trees.behaviour.Behaviour):
         super().__init__(name)
         self.ros_node = ros_node
         self.client = ActionClient(self.ros_node, NavigateToPose, 'navigate_to_pose')
-        self.blackboard = self.attach_blackboard_client(name=name)
-        self.blackboard.register_key(key="robot_pos", access=py_trees.common.Access.READ)
-        self.blackboard.register_key(key="target_cell", access=py_trees.common.Access.READ)
         self.current_pose = None
         self.goal_sent = False
         self.target_yaw = None
@@ -93,18 +92,12 @@ class TurnToTargetCellBehavior(py_trees.behaviour.Behaviour):
         self.goal_future = self.result_future = self.goal_handle = None
         self.goal_sent = False
 
-        try:
-            rp = self.blackboard.robot_pos
-        except KeyError:
-            rp = None
-        try:
-            tc = self.blackboard.target_cell
-        except KeyError:
-            tc = None
+        rp = bb.robot_pos
+        tc = bb.target_cell
         if not rp or not tc:
             self.target_yaw = None
             return
-            
+
         curr_c, curr_r = rp
         target_c, target_r = tc
         
@@ -151,11 +144,6 @@ class MoveRelativeOdomBehavior(py_trees.behaviour.Behaviour):
         self.climb_dist = float(climb_dist)
         self.flat_dist = float(flat_dist)
         self.client = ActionClient(self.ros_node, NavigateToPose, 'navigate_to_pose')
-        self.blackboard = self.attach_blackboard_client(name=name)
-        self.blackboard.register_key(key="target_cell", access=py_trees.common.Access.READ)
-        self.blackboard.register_key(key="robot_pos", access=py_trees.common.Access.WRITE)
-        self.blackboard.register_key(key="visit_path", access=py_trees.common.Access.WRITE)
-        self.blackboard.register_key(key="just_climbed", access=py_trees.common.Access.WRITE)
         self.current_pose = None
         self.goal_sent = False
         self.odom_sub = self.ros_node.create_subscription(Odometry, odom_topic, self.odom_callback, 10)
@@ -166,12 +154,6 @@ class MoveRelativeOdomBehavior(py_trees.behaviour.Behaviour):
         siny_cosp = 2 * (q.w * q.z + q.x * q.y)
         cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
         return math.atan2(siny_cosp, cosy_cosp)
-
-    def _bb_get(self, key, default=None):
-        try:
-            return self.blackboard.get(key)
-        except KeyError:
-            return default
 
     def euler_to_quaternion(self, yaw): return [0.0, 0.0, math.sin(yaw / 2), math.cos(yaw / 2)]
 
@@ -184,21 +166,19 @@ class MoveRelativeOdomBehavior(py_trees.behaviour.Behaviour):
     def update(self):
         if not self.goal_sent:
             if self.current_pose is None: return py_trees.common.Status.RUNNING
-            
-            rp = self._bb_get("robot_pos")
-            tc = self._bb_get("target_cell")
-            curr_c, curr_r = rp if rp else (2, 0)
-            target_c, target_r = tc if tc else (2, 1)
+
+            curr_c, curr_r = bb.get("robot_pos", (2, 0))
+            target_c, target_r = bb.get("target_cell", (2, 1))
 
             curr_x = self.current_pose.position.x
             curr_y = self.current_pose.position.y
             curr_yaw = self.get_yaw(self.current_pose.orientation)
-            
+
             dc = target_c - curr_c
             dr = target_r - curr_r
             if dc == 0 and dr == 0: return py_trees.common.Status.SUCCESS
 
-            just_climbed = self._bb_get("just_climbed")
+            just_climbed = bb.just_climbed
             dist = self.climb_dist if just_climbed else self.flat_dist
             
             # [FIX LỖI ĐI NGANG]: Sử dụng trực tiếp curr_yaw thay vì tính path_yaw từ sa bàn
@@ -226,16 +206,16 @@ class MoveRelativeOdomBehavior(py_trees.behaviour.Behaviour):
         if not self.result_future.done(): return py_trees.common.Status.RUNNING
         
         if self.result_future.result().status == GoalStatus.STATUS_SUCCEEDED:
-            tc = self._bb_get("target_cell")
-            self.blackboard.robot_pos = tc
+            tc = bb.target_cell
+            bb.robot_pos = tc
 
-            vp = self._bb_get("visit_path") or []
+            vp = bb.get("visit_path", []) or []
             if vp and len(vp) >= 2 and vp[-2] == tc:
                 vp.pop()
             else:
                 vp.append(tc)
-            self.blackboard.visit_path = vp
-            self.blackboard.just_climbed = False
+            bb.visit_path = vp
+            bb.just_climbed = False
             return py_trees.common.Status.SUCCESS
         return py_trees.common.Status.FAILURE
 

@@ -70,7 +70,7 @@ class CalculatePickElevationAction(py_trees.behaviour.Behaviour):
         target_c, target_r = self.blackboard.target_cell
         h_current = self.elevation_map.get((curr_c, curr_r), self.default_elevation)
         h_target = self.elevation_map.get((target_c, target_r), self.default_elevation)
-        
+        CheckBlackboardValue
         if h_target < h_current: self.blackboard.current_arm1_z = 0.0       # Thấp hơn
         elif h_target > h_current: self.blackboard.current_arm1_z = 325.0   # Cao hơn
         else: self.blackboard.current_arm1_z = 125.0                        # Bằng nhau

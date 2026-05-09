@@ -4,6 +4,9 @@ from rclpy.action import ActionClient
 from action_msgs.msg import GoalStatus
 from ak60_bringup.action import ClimbStep
 
+from r2_bt.blackboard import bb
+
+
 class ClimbStepBehavior(py_trees.behaviour.Behaviour):
     def __init__(self, name, ros_node, velocity):
         super().__init__(name)
@@ -37,20 +40,10 @@ class ClimbStepBehavior(py_trees.behaviour.Behaviour):
             self.goal_handle.cancel_goal_async()
 
 
-def _bb_get(client, key, default=None):
-    try:
-        return client.get(key)
-    except KeyError:
-        return default
-
-
 class IsClimbingUpCondition(py_trees.behaviour.Behaviour):
     def __init__(self, name, ros_node):
         super().__init__(name)
         self.ros_node = ros_node
-        self.blackboard = self.attach_blackboard_client(name=name)
-        self.blackboard.register_key(key="robot_pos", access=py_trees.common.Access.READ)
-        self.blackboard.register_key(key="target_cell", access=py_trees.common.Access.READ)
         self.elevation_map = {}
         self.default_elevation = 0.0
 
@@ -63,24 +56,20 @@ class IsClimbingUpCondition(py_trees.behaviour.Behaviour):
         return True
 
     def update(self):
-        rp = _bb_get(self.blackboard, "robot_pos")
-        tc = _bb_get(self.blackboard, "target_cell")
-        curr_c, curr_r = rp if rp else (2, 0)
-        target_c, target_r = tc if tc else (2, 1)
-        
+        curr_c, curr_r = bb.get("robot_pos", (2, 0))
+        target_c, target_r = bb.get("target_cell", (2, 1))
+
         h_curr   = self.elevation_map.get((curr_c,   curr_r),   self.default_elevation)
         h_target = self.elevation_map.get((target_c, target_r), self.default_elevation)
         return (py_trees.common.Status.SUCCESS
                 if h_target > h_curr
                 else py_trees.common.Status.FAILURE)
 
+
 class HasElevationChangeCondition(py_trees.behaviour.Behaviour):
     def __init__(self, name, ros_node):
         super().__init__(name)
         self.ros_node = ros_node
-        self.blackboard = self.attach_blackboard_client(name=name)
-        self.blackboard.register_key(key="robot_pos", access=py_trees.common.Access.READ)
-        self.blackboard.register_key(key="target_cell", access=py_trees.common.Access.READ)
         self.elevation_map = {}
         self.default_elevation = 0.0
 
@@ -93,16 +82,15 @@ class HasElevationChangeCondition(py_trees.behaviour.Behaviour):
         return True
 
     def update(self):
-        rp = _bb_get(self.blackboard, "robot_pos")
-        tc = _bb_get(self.blackboard, "target_cell")
-        curr_c, curr_r = rp if rp else (2, 0)
-        target_c, target_r = tc if tc else (2, 1)
-        
+        curr_c, curr_r = bb.get("robot_pos", (2, 0))
+        target_c, target_r = bb.get("target_cell", (2, 1))
+
         h_curr   = self.elevation_map.get((curr_c,   curr_r),   self.default_elevation)
         h_target = self.elevation_map.get((target_c, target_r), self.default_elevation)
         return (py_trees.common.Status.SUCCESS
                 if h_target != h_curr
                 else py_trees.common.Status.FAILURE)
+
 
 class DynamicClimbStepBehavior(py_trees.behaviour.Behaviour):
     def __init__(self, name, ros_node):
@@ -111,10 +99,6 @@ class DynamicClimbStepBehavior(py_trees.behaviour.Behaviour):
         self.client = ActionClient(self.ros_node, ClimbStep, 'climb_step')
         self.goal_future = self.result_future = self.goal_handle = None
         self.needs_climb = False
-        self.blackboard = self.attach_blackboard_client(name=name)
-        self.blackboard.register_key(key="robot_pos", access=py_trees.common.Access.READ)
-        self.blackboard.register_key(key="target_cell", access=py_trees.common.Access.READ)
-        self.blackboard.register_key(key="just_climbed", access=py_trees.common.Access.WRITE)
         self.elevation_map = {}
         self.default_elevation = 0.0
 
@@ -128,10 +112,8 @@ class DynamicClimbStepBehavior(py_trees.behaviour.Behaviour):
 
     def initialise(self):
         self.goal_future = self.result_future = self.goal_handle = None
-        rp = _bb_get(self.blackboard, "robot_pos")
-        tc = _bb_get(self.blackboard, "target_cell")
-        curr_c, curr_r = rp if rp else (2, 0)
-        target_c, target_r = tc if tc else (2, 1)
+        curr_c, curr_r = bb.get("robot_pos", (2, 0))
+        target_c, target_r = bb.get("target_cell", (2, 1))
 
         h_curr   = self.elevation_map.get((curr_c,   curr_r),   self.default_elevation)
         h_target = self.elevation_map.get((target_c, target_r), self.default_elevation)
@@ -139,9 +121,9 @@ class DynamicClimbStepBehavior(py_trees.behaviour.Behaviour):
 
         if delta_h == 0:
             self.needs_climb = False
-            self.blackboard.just_climbed = False
+            bb.just_climbed = False
             return
-            
+
         self.needs_climb = True
         goal_msg = ClimbStep.Goal()
         goal_msg.velocity = 0.3 if delta_h > 0 else 0.1
@@ -156,7 +138,7 @@ class DynamicClimbStepBehavior(py_trees.behaviour.Behaviour):
         if self.result_future is None: self.result_future = self.goal_handle.get_result_async()
         if not self.result_future.done(): return py_trees.common.Status.RUNNING
         if self.result_future.result().status == GoalStatus.STATUS_SUCCEEDED:
-            self.blackboard.just_climbed = True
+            bb.just_climbed = True
             return py_trees.common.Status.SUCCESS
         return py_trees.common.Status.FAILURE
 
@@ -165,4 +147,3 @@ class DynamicClimbStepBehavior(py_trees.behaviour.Behaviour):
                 and self.needs_climb
                 and getattr(self, 'goal_handle', None)):
             self.goal_handle.cancel_goal_async()
-            
