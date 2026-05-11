@@ -29,12 +29,12 @@ CTRL-C để thoát.
 move_bindings = {
     'q': (5.0, 0.0, 0.0, 0.0),   # +5 mm
     'a': (-5.0, 0.0, 0.0, 0.0),  # -5 mm
-    'w': (0.0, 2.0, 0.0, 0.0),   # +2 độ
-    's': (0.0, -2.0, 0.0, 0.0),  # -2 độ
-    'e': (0.0, 0.0, 2.0, 0.0),   # +2 độ
-    'd': (0.0, 0.0, -2.0, 0.0),  # -2 độ
-    'r': (0.0, 0.0, 0.0, 2.0),   # +2 độ
-    'f': (0.0, 0.0, 0.0, -2.0),  # -2 độ
+    'w': (0.0, 5.0, 0.0, 0.0),   # +5 độ
+    's': (0.0, -5.0, 0.0, 0.0),  # -5 độ
+    'e': (0.0, 0.0, -5.0, 0.0),   # +5 độ
+    'd': (0.0, 0.0, 5.0, 0.0),  # -5 độ
+    'r': (0.0, 0.0, 0.0, 5.0),   # +5 độ
+    'f': (0.0, 0.0, 0.0, -5.0),  # -5 độ
 }
 
 class TeleopKeyboardNode(Node):
@@ -99,7 +99,7 @@ class TeleopKeyboardNode(Node):
         self.target_pos[0] = self.clamp(self.target_pos[0] + deltas[0], 0.0, 780.0)
         self.target_pos[1] = self.clamp(self.target_pos[1] + deltas[1], -5.0, 90.0)
         self.target_pos[2] = self.clamp(self.target_pos[2] + deltas[2], -90.0, 90.0)
-        self.target_pos[3] = self.clamp(self.target_pos[3] + deltas[3], -30.0, 80.0)
+        self.target_pos[3] = self.clamp(self.target_pos[3] + deltas[3], 0.0, 240.0)
 
         self.publish_command()
 

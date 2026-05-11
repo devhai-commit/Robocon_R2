@@ -69,7 +69,7 @@ class SteerNode(Node):
             # 1. Bật Gripper (1,000,000)
             self.switch_baudrate(1000000)
             self.gripper.EnableTorque(1, True)
-            self.gripper.WritePosEx(1, 2648, 60, 50, 500)
+            self.gripper.WritePosEx(1, 0, 60, 50, 500)
             
             # 2. Bật Servo Hiwonder (115,200)
             self.switch_baudrate(115200)
@@ -156,6 +156,11 @@ def main(args=None):
         rclpy.spin(node)
     except KeyboardInterrupt:
         node.get_logger().info("Nhận lệnh Ctrl+C. Đang ngắt lực động cơ...")
+    except Exception as e:
+        node.get_logger().error(f"Node bị văng lỗi: {e}")   
+            
+    finally:
+        node.get_logger().info("🛑 Đang ngắt lực động cơ khẩn cấp...")
         try:
             with node.serial_lock:
                 node.switch_baudrate(115200)
@@ -166,12 +171,12 @@ def main(args=None):
                 node.gripper.EnableTorque(1, False)
                 time.sleep(0.1)
                 
-                node.ser.close()
-                node.get_logger().info("✅ Đã nhả lực 8 Servo và Gripper. Đóng cổng Serial thành công!")
+                if node.ser and node.ser.is_open:
+                    node.ser.close()
+                node.get_logger().info("✅ Đã nhả lực 8 Servo và Gripper. Đóng cổng Serial an toàn!")
         except Exception as e:
             node.get_logger().error(f"❌ Lỗi tắt phần cứng: {e}")
             
-    finally:
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()

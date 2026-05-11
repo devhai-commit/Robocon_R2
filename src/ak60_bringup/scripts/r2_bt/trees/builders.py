@@ -81,7 +81,7 @@ def build_move_subtree(ros_node, ai_target_id='class5'):
     """Subtree xử lý một bước vào ô lưới: quay hướng → vision → leo/di chuyển."""
     subtree = py_trees.composites.Sequence("Process_And_Enter_Cell", memory=True)
 
-    subtree.add_child(GoToRelativePoseBehavior("Lui_Truoc_Khi_Xoay", ros_node, dx=-0.08, dy=0.0, target_yaw_deg=0.0))
+    # subtree.add_child(GoToRelativePoseBehavior("Lui_Truoc_Khi_Xoay", ros_node, dx=-0.1, dy=0.0, target_yaw_deg=0.0))
     subtree.add_child(TurnToTargetCellBehavior("Turn_To_Face_Cell", ros_node))
 
     subtree.add_child(py_trees.decorators.FailureIsSuccess(
@@ -118,6 +118,12 @@ def build_move_subtree(ros_node, ai_target_id='class5'):
         ),
     ))
     real_seq.add_child(build_pick_and_place_sequence_dynamic(ros_node))
+    real_seq.add_child(py_trees.behaviours.SetBlackboardVariable(
+        name="Set_Just_Picked",
+        variable_name="just_picked",
+        variable_value="yes",
+        overwrite=True,
+    ))
     real_seq.add_child(IncrementRealCountAction("Add_Score"))
     real_seq.add_child(MarkAsVisitedAction("Mark_Accessible"))
 
@@ -139,20 +145,26 @@ def build_move_subtree(ros_node, ai_target_id='class5'):
     box_selector.add_children([real_seq, fake_seq, empty_seq])
     subtree.add_child(box_selector)
 
-    climb_check = py_trees.composites.Sequence("Align_If_Elevation_Change", memory=True)
-    climb_check.add_child(HasElevationChangeCondition("Check_Elevation", ros_node))
-    climb_check.add_child(WallAlignmentBehavior(
-        "Align_Before_Climb", ros_node,
-        window_degrees=NAV_PARAMS['wall_window_deg'],
-        goal_distance=NAV_PARAMS['wall_dist_climb'],
-    ))
-    subtree.add_child(py_trees.decorators.FailureIsSuccess("Ignore_Align_2", climb_check))
+    # climb_check = py_trees.composites.Sequence("Align_If_Elevation_Change", memory=True)
+    # climb_check.add_child(HasElevationChangeCondition("Check_Elevation", ros_node))
+    # climb_check.add_child(WallAlignmentBehavior(
+    #     "Align_Before_Climb", ros_node,
+    #     window_degrees=NAV_PARAMS['wall_window_deg'],
+    #     goal_distance=NAV_PARAMS['wall_dist_climb'],
+    # ))
+    # subtree.add_child(py_trees.decorators.FailureIsSuccess("Ignore_Align_2", climb_check))
 
     subtree.add_child(DynamicClimbStepBehavior("Auto_Climb", ros_node))
     subtree.add_child(MoveRelativeOdomBehavior(
         "Move_Into_Cell", ros_node,
         climb_dist=NAV_PARAMS['climb_dist'],
         flat_dist=NAV_PARAMS['flat_dist'],
+    ))
+    subtree.add_child(py_trees.behaviours.SetBlackboardVariable(
+        name="Reset_Just_Picked",
+        variable_name="just_picked",
+        variable_value="no",
+        overwrite=True,
     ))
 
     return subtree

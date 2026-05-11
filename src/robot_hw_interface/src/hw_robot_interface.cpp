@@ -390,7 +390,7 @@ hardware_interface::return_type Ak60RobotHwInterface::read(const rclcpp::Time & 
       int gripper_id = joint_ids_cache_[j_idx];
       if (gripper_id >= 1 && gripper_id <= (int)gripper_rx_buffer_.size()) {
         double raw_tick = static_cast<double>(gripper_rx_buffer_[gripper_id - 1]);
-        hw_states_position_[j_idx] = ((raw_tick - 2150.0) / 4096.0) * (2.0 * M_PI);
+        hw_states_position_[j_idx] = ((raw_tick - 0.0) / 4096.0) * (2.0 * M_PI);
       }
     }
 
@@ -519,8 +519,8 @@ hardware_interface::return_type Ak60RobotHwInterface::write(const rclcpp::Time &
       if (gripper_id != 1) continue; 
 
       double cmd_rad = hw_commands_[j_idx];
-      double cmd_raw = cmd_rad * 4096.0 / (2.0 * M_PI) + 2150.0;
-      cmd_raw = std::clamp(cmd_raw, 1500.0, 3000.0);
+      double cmd_raw = cmd_rad * 4096.0 / (2.0 * M_PI);
+      cmd_raw = std::clamp(cmd_raw, 0.0, 2050.0);
       
       waveshare_cmd_msg_.data[0] = static_cast<int32_t>(std::round(cmd_raw));
     }

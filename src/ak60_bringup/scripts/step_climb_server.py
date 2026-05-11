@@ -27,7 +27,7 @@ class StepClimbServer(Node):
             self, ClimbStep, 'climb_step', self.execute_callback)
         
         self.current_pitch = 0.0
-        self.current_yaw = 0.0
+        # self.current_yaw = 0.0
         self.get_logger().info('Action Server Leo Bậc (Odometry & Math) đã sẵn sàng!')
 
     def odom_callback(self, msg):
@@ -43,7 +43,7 @@ class StepClimbServer(Node):
             pitch_rad = math.asin(sinp)
         self.current_pitch = math.degrees(pitch_rad)
 
-        self.current_yaw = math.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
+        # self.current_yaw = math.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
 
     # Thay đổi: Bỏ chữ "async" trước def
     def execute_callback(self, goal_handle):
@@ -59,7 +59,7 @@ class StepClimbServer(Node):
         KP_YAW  = CLIMB_PARAMS['yaw_kp']
         MAX_ANG = CLIMB_PARAMS['yaw_max_ang']
 
-        initial_yaw = self.current_yaw
+        # initial_yaw = self.current_yaw
         move_cmd = Twist()
         move_cmd.linear.x = target_vel
 
@@ -84,8 +84,8 @@ class StepClimbServer(Node):
                     return result
 
                 # 3. Yaw lock: bù góc lệch so với hướng ban đầu
-                yaw_err = (initial_yaw - self.current_yaw + math.pi) % (2 * math.pi) - math.pi
-                move_cmd.angular.z = max(-MAX_ANG, min(MAX_ANG, KP_YAW * yaw_err))
+                # yaw_err = (initial_yaw - self.current_yaw + math.pi) % (2 * math.pi) - math.pi
+                # move_cmd.angular.z = max(-MAX_ANG, min(MAX_ANG, KP_YAW * yaw_err))
 
                 # 4. Điều khiển & Feedback
                 self._cmd_vel_pub.publish(move_cmd)
@@ -96,7 +96,7 @@ class StepClimbServer(Node):
                 if stage == 0:
                     if abs(self.current_pitch) > pitch_threshold:
                         stage = 1
-                        self.get_logger().info(f'Phát hiện leo bậc: Pitch = {self.current_pitch:.2f}°, Yaw lock = {math.degrees(initial_yaw):.1f}°')
+                        self.get_logger().info(f'Phát hiện leo bậc: Pitch = {self.current_pitch:.2f}°')
                 elif stage == 1:
                     if abs(self.current_pitch) < flat_threshold:
                         self.get_logger().info('Đã vượt qua bậc. Robot đã phẳng.')

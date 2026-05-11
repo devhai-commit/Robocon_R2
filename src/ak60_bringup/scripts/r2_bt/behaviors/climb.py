@@ -121,7 +121,7 @@ class DynamicClimbStepBehavior(py_trees.behaviour.Behaviour):
         heights = self.ros_node.get_parameter('map_heights').value
         self.default_elevation = self.ros_node.get_parameter('default_elevation').value
         self.elevation_map = {(c, r): float(h) for c, r, h in zip(cols, rows, heights)}
-        return self.client.wait_for_server(timeout_sec=5.0)
+        return self.client.wait_for_server(timeout_sec=10.0)
 
     def initialise(self):
         self.goal_future = self.result_future = self.goal_handle = None

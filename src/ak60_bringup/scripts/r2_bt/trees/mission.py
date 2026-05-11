@@ -24,6 +24,7 @@ _SEED_KEYS = (
     "grid_status",
     "target_cell",
     "just_climbed",
+    "just_picked",
     "current_arm1_z",
     "priority_col",
     "target_boxes_list",
@@ -50,6 +51,7 @@ def _seed_blackboard():
     }
     seed.target_cell = (2, 1)
     seed.just_climbed = False
+    seed.just_picked = "no"
     seed.current_arm1_z = 125.0
     seed.priority_col = 2
     seed.target_boxes_list = []
@@ -87,17 +89,17 @@ def _build_main_mission(ros_node, lat, post_ramp_yaw, side, ai_target_id):
 
     # --- PHASE 0: GẬP TAY AN TOÀN & CHỜ LỆNH START TỪ MÀN HÌNH ---
     pre_init_seq = py_trees.composites.Sequence("Phase_0_Standby", memory=True)
-    # pre_init_seq.add_child(ArmSequenceBTNode("Tool_Arm_Home", ros_node, f"home_pose_{side}", duration=2.0))
+    pre_init_seq.add_child(ArmSequenceBTNode("Tool_Arm_Home", ros_node, f"home_pose_{side}", duration=2.0))
     pre_init_seq.add_child(MoveArmBehavior("Box_Arm_Home", ros_node, target_pose=[325.0, 0.0, 0.0, 0.0]))
     pre_init_seq.add_child(WaitForStartSignalBehavior("Wait_For_GUI_Strategy", ros_node))
     main.add_child(pre_init_seq)
 
     # # --- Phase 1: Lấy dụng cụ và tiến ra cửa lưới ---
     init_seq = py_trees.composites.Sequence("Khoi_Dong_Va_Lay_Dung_Cu", memory=True)
-    # init_seq.add_child(ArmSequenceBTNode("Tool_Arm_Approach", ros_node, f"approach_j4_{side}", duration=1.0))
-    # init_seq.add_child(GoToRelativePoseBehavior("Tien_Lay_Dung_Cu", ros_node, dx=0.22, dy=lat * 0.89, target_yaw_deg=0.0))
-    # init_seq.add_child(build_tool_assembly_sequence(ros_node, side=side))
-    # init_seq.add_child(GoToRelativePoseBehavior("Tien_Ra_Cua_Cell", ros_node, dx=1.6, dy=-lat * 2.5, target_yaw_deg=0.0))
+    init_seq.add_child(ArmSequenceBTNode("Tool_Arm_Approach", ros_node, f"approach_j4_{side}", duration=1.0))
+    init_seq.add_child(GoToRelativePoseBehavior("Tien_Lay_Dung_Cu", ros_node, dx=0.42, dy=lat * 0.89, target_yaw_deg=0.0))
+    init_seq.add_child(build_tool_assembly_sequence(ros_node, side=side))
+    init_seq.add_child(GoToRelativePoseBehavior("Tien_Ra_Cua_Cell", ros_node, dx=1.6, dy=-lat * 2.5, target_yaw_deg=0.0))
     init_seq.add_child(py_trees.behaviours.SetBlackboardVariable(
         name="Set_Target_2_1",
         variable_name="target_cell",

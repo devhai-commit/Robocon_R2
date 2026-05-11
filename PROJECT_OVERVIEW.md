@@ -129,7 +129,7 @@ BT Root (Sequence)
               └── HUNT → DecideNext(EXPLORE) → build_move_subtree → FAIL(loop)
 ```
 
-Mỗi `build_move_subtree` thực hiện: **TurnToCell → WallAlign → FollowTarget(AI) → GraspLogic → Climb → MoveIntoCell**
+Mỗi `build_move_subtree` thực hiện: **TurnToCell (backup 0.2m nếu just_picked+ngang) → WallAlign → FollowTarget(AI) → GraspLogic → Climb → MoveIntoCell**
 
 ---
 
@@ -525,7 +525,7 @@ Entry point ROS 2: khởi tạo Node, declare parameters từ `FIELD_CONFIGS`, i
 | Class | Gọi Action | Mục đích |
 |-------|-----------|----------|
 | `GoToRelativePoseBehavior` | `navigate_to_pose` | Di chuyển dx,dy trong frame robot (tính absolute target từ odom) |
-| `TurnToTargetCellBehavior` | `navigate_to_pose` | Đọc `robot_pos` và `target_cell` từ blackboard → tính góc → xoay tại chỗ |
+| `TurnToTargetCellBehavior` | `navigate_to_pose` | Đọc `robot_pos`, `target_cell`, `just_picked` từ blackboard → nếu `just_picked=="yes"` và di chuyển ngang thì lui 0.2m trước → rồi xoay tại chỗ |
 | `MoveRelativeOdomBehavior` | `navigate_to_pose` | Di chuyển thẳng (climb_dist hoặc flat_dist) dựa trên thay đổi cao độ |
 
 Tất cả dùng pattern **non-blocking polling**: gửi goal trong `initialise()`, kiểm tra future trong `update()` (RUNNING/SUCCESS/FAILURE).

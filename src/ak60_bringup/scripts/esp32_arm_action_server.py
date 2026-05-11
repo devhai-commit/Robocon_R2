@@ -124,7 +124,7 @@ class Esp32ArmServer(Node):
                                 self.get_logger().error(f"Lỗi đọc data struct: {parse_err}")
                         state = 0
                 else:
-                    time.sleep(0.02) # 50 Hz
+                    time.sleep(0.002) # 50 Hz
             except serial.SerialException:
                 self.get_logger().error("Cáp UART bị rút đột ngột!")
                 break
