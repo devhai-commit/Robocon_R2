@@ -82,19 +82,6 @@ private:
   // ===== Time =====
   rclcpp::Time last_cmd_time_;
 
-  // ================= STATE MACHINE =================
-  enum class SteerState
-  {
-    IDLE,
-    ALIGN,
-    DRIVE,
-    ROTATE,
-    LATERAL
-  };
-
-  SteerState state_ = SteerState::IDLE;
-  SteerState last_state_ = SteerState::IDLE;
-
   double last_vy_ = 0.0;
 
   // hysteresis

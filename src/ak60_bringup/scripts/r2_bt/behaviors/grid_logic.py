@@ -2,33 +2,38 @@
 import json
 import py_trees
 
-from r2_bt.blackboard import bb
-from r2_bt.behaviors.blackboard_ops import CheckBB, CheckBlackboardValue  # noqa: F401  (re-export)
 from r2_bt.config import (
     GRID_MIN_COL, GRID_MAX_COL, GRID_MIN_ROW, GRID_MAX_ROW, manhattan_distance,
 )
 
 
+_EXIT_CELLS = [(1, 4), (3, 4)]
+
+
 class WaitForStartSignalBehavior(py_trees.behaviour.Behaviour):
     """Đứng chờ tín hiệu JSON từ GUI.
 
-    Đọc ``bb.gui_start_raw`` (do ``ROSTopicToBB`` ghi từ topic /gui_start_signal),
+    Đọc ``gui_start_raw`` (do ``ROSTopicToBB`` ghi từ topic /gui_start_signal),
     parse JSON, ghi ``priority_col`` và ``target_boxes_list`` vào blackboard.
     """
 
     def __init__(self, name, ros_node):
         super().__init__(name)
         self.ros_node = ros_node
+        self.blackboard = self.attach_blackboard_client(name=name)
+        self.blackboard.register_key(key="gui_start_raw", access=py_trees.common.Access.READ)
+        self.blackboard.register_key(key="priority_col", access=py_trees.common.Access.WRITE)
+        self.blackboard.register_key(key="target_boxes_list", access=py_trees.common.Access.WRITE)
 
     def update(self):
-        raw = bb.gui_start_raw
-        if raw is None:
+        if not self.blackboard.exists("gui_start_raw"):
             self.ros_node.get_logger().info(
                 f"[{self.name}] 🟡 Đang chờ ấn nút START trên màn hình...",
                 throttle_duration_sec=2.0,
             )
             return py_trees.common.Status.RUNNING
 
+        raw = self.blackboard.gui_start_raw
         try:
             data = json.loads(raw)
         except (ValueError, TypeError) as e:
@@ -38,8 +43,8 @@ class WaitForStartSignalBehavior(py_trees.behaviour.Behaviour):
         if data.get("command") != "START":
             return py_trees.common.Status.RUNNING
 
-        bb.priority_col = data.get("priority_col", 2)
-        bb.target_boxes_list = [tuple(box) for box in data.get("target_boxes", [])]
+        self.blackboard.priority_col = data.get("priority_col", 2)
+        self.blackboard.target_boxes_list = [tuple(box) for box in data.get("target_boxes", [])]
         return py_trees.common.Status.SUCCESS
 
 
@@ -51,6 +56,10 @@ class CalculatePickElevationAction(py_trees.behaviour.Behaviour):
         self.ros_node = ros_node
         self.elevation_map = {}
         self.default_elevation = 400.0
+        self.blackboard = self.attach_blackboard_client(name=name)
+        self.blackboard.register_key(key="robot_pos", access=py_trees.common.Access.READ)
+        self.blackboard.register_key(key="target_cell", access=py_trees.common.Access.READ)
+        self.blackboard.register_key(key="current_arm1_z", access=py_trees.common.Access.WRITE)
 
     def setup(self, **kwargs):
         cols = self.ros_node.get_parameter('map_cols').value
@@ -61,38 +70,45 @@ class CalculatePickElevationAction(py_trees.behaviour.Behaviour):
         return True
 
     def update(self):
-        curr_c, curr_r = bb.get("robot_pos", (2, 0))
-        target_c, target_r = bb.get("target_cell", (2, 1))
+        curr_c, curr_r = self.blackboard.robot_pos
+        target_c, target_r = self.blackboard.target_cell
 
         h_current = self.elevation_map.get((curr_c, curr_r), self.default_elevation)
         h_target = self.elevation_map.get((target_c, target_r), self.default_elevation)
 
         if h_target < h_current:
-            bb.current_arm1_z = 0.0
+            self.blackboard.current_arm1_z = 0.0
         elif h_target > h_current:
-            bb.current_arm1_z = 325.0
+            self.blackboard.current_arm1_z = 325.0
         else:
-            bb.current_arm1_z = 125.0
+            self.blackboard.current_arm1_z = 125.0
 
         self.ros_node.get_logger().info(
-            f"[{self.name}] 🤖 Arm 1 Z = {bb.current_arm1_z}mm"
+            f"[{self.name}] 🤖 Arm 1 Z = {self.blackboard.current_arm1_z}mm"
         )
         return py_trees.common.Status.SUCCESS
 
 
 class DecideNextGridCellAction(py_trees.behaviour.Behaviour):
-    EXIT_CELLS = [(1, 4), (3, 4)]
+    EXIT_CELLS = _EXIT_CELLS
 
     def __init__(self, name, ros_node, mode):
         super().__init__(name)
         self.ros_node, self.mode = ros_node, mode
+        self.blackboard = self.attach_blackboard_client(name=name)
+        self.blackboard.register_key(key="robot_pos", access=py_trees.common.Access.READ)
+        self.blackboard.register_key(key="grid_status", access=py_trees.common.Access.READ)
+        self.blackboard.register_key(key="visit_path", access=py_trees.common.Access.READ)
+        self.blackboard.register_key(key="priority_col", access=py_trees.common.Access.READ)
+        self.blackboard.register_key(key="target_boxes_list", access=py_trees.common.Access.READ)
+        self.blackboard.register_key(key="target_cell", access=py_trees.common.Access.WRITE)
 
     def update(self):
-        curr_c, curr_r = bb.get("robot_pos", (2, 0))
-        grid_status = bb.get("grid_status", {}) or {}
-        visit_path = bb.get("visit_path", []) or []
-        p_col = bb.get("priority_col", 2)
-        t_boxes = bb.get("target_boxes_list", []) or []
+        curr_c, curr_r = self.blackboard.robot_pos
+        grid_status = self.blackboard.grid_status or {}
+        visit_path = self.blackboard.visit_path or []
+        p_col = self.blackboard.priority_col if self.blackboard.exists("priority_col") else 2
+        t_boxes = self.blackboard.target_boxes_list if self.blackboard.exists("target_boxes_list") else []
 
         possible_neighbors = [
             (curr_c + dc, curr_r + dr)
@@ -135,7 +151,7 @@ class DecideNextGridCellAction(py_trees.behaviour.Behaviour):
             target_cell = closest_cell
 
         if target_cell:
-            bb.target_cell = target_cell
+            self.blackboard.target_cell = target_cell
             return py_trees.common.Status.SUCCESS
         return py_trees.common.Status.FAILURE
 
@@ -143,69 +159,71 @@ class DecideNextGridCellAction(py_trees.behaviour.Behaviour):
 class IncrementRealCountAction(py_trees.behaviour.Behaviour):
     def __init__(self, name):
         super().__init__(name)
+        self.blackboard = self.attach_blackboard_client(name=name)
+        # WRITE access cho phép cả đọc lẫn ghi.
+        self.blackboard.register_key(key="real_box_count", access=py_trees.common.Access.WRITE)
 
     def update(self):
-        bb.real_box_count = (bb.real_box_count or 0) + 1
+        current = self.blackboard.real_box_count if self.blackboard.exists("real_box_count") else 0
+        self.blackboard.real_box_count = (current or 0) + 1
         return py_trees.common.Status.SUCCESS
 
 
 class MarkAsVisitedAction(py_trees.behaviour.Behaviour):
     def __init__(self, name):
         super().__init__(name)
+        self.blackboard = self.attach_blackboard_client(name=name)
+        self.blackboard.register_key(key="target_cell", access=py_trees.common.Access.READ)
+        self.blackboard.register_key(key="grid_status", access=py_trees.common.Access.WRITE)
 
     def update(self):
-        tc = bb.target_cell
-        gs = bb.grid_status
+        if not (self.blackboard.exists("target_cell") and self.blackboard.exists("grid_status")):
+            return py_trees.common.Status.SUCCESS
+        tc = self.blackboard.target_cell
+        gs = self.blackboard.grid_status
         if tc and gs:
             gs[tc]['scanned'] = True
             gs[tc]['state'] = 'accessible'
             gs[tc]['visited'] = True
-            bb.grid_status = gs
+            self.blackboard.grid_status = gs
         return py_trees.common.Status.SUCCESS
 
 
 class MarkAsObstacleAction(py_trees.behaviour.Behaviour):
     def __init__(self, name):
         super().__init__(name)
+        self.blackboard = self.attach_blackboard_client(name=name)
+        self.blackboard.register_key(key="target_cell", access=py_trees.common.Access.READ)
+        self.blackboard.register_key(key="grid_status", access=py_trees.common.Access.WRITE)
 
     def update(self):
-        tc = bb.target_cell
-        gs = bb.grid_status
+        if not (self.blackboard.exists("target_cell") and self.blackboard.exists("grid_status")):
+            return py_trees.common.Status.SUCCESS
+        tc = self.blackboard.target_cell
+        gs = self.blackboard.grid_status
         if tc and gs:
             gs[tc]['scanned'] = True
             gs[tc]['state'] = 'obstacle'
-            bb.grid_status = gs
+            self.blackboard.grid_status = gs
         return py_trees.common.Status.SUCCESS
 
 
 class IsAtExitCellCondition(py_trees.behaviour.Behaviour):
-    EXIT_CELLS = [(1, 4), (3, 4)]
+    EXIT_CELLS = _EXIT_CELLS
 
     def __init__(self, name):
         super().__init__(name)
+        self.blackboard = self.attach_blackboard_client(name=name)
+        self.blackboard.register_key(key="robot_pos", access=py_trees.common.Access.READ)
 
     def update(self):
+        if not self.blackboard.exists("robot_pos"):
+            return py_trees.common.Status.FAILURE
         return (
             py_trees.common.Status.SUCCESS
-            if bb.robot_pos in self.EXIT_CELLS
+            if self.blackboard.robot_pos in self.EXIT_CELLS
             else py_trees.common.Status.FAILURE
         )
-
-
-class CheckBlackboardValue(py_trees.behaviour.Behaviour):
-    def __init__(self, name, variable_name, expected_value, op=operator.eq):
-        super().__init__(name)
-        self.variable_name = variable_name
-        self.expected_value = expected_value
-        self.op = op
-        self.blackboard = self.attach_blackboard_client(name=name)
-        self.blackboard.register_key(key=variable_name, access=py_trees.common.Access.READ)
-
-    def update(self):
-        val = _safe_get(self.blackboard, self.variable_name)
-        if val is not None and self.op(val, self.expected_value):
-            return py_trees.common.Status.SUCCESS
-        return py_trees.common.Status.FAILURE
 
 
 class KeepRunningUntilSuccess(py_trees.decorators.Decorator):

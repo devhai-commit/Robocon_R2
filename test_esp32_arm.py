@@ -56,16 +56,13 @@ def main(args=None):
 
     # Danh sách thứ tự chuẩn để chạy Auto Macro
     macro_sequence = [
-        ("home_pose", 1.5),
-        ("approach_j1", 2.0),
-        ("approach_j4", 1.5),
-        ("approach_j3", 2.0), # DC chạy cần thời gian dài hơn 1 chút
-        ("grasp", 1.0),
-        ("move_back_J4", 1.5),
-        ("move_back_J3", 2.0),
-        ("move_back_J1", 2.0),
-        ("move_asem_J3", 2.0),
-        ("release", 1.0)
+        ("home_pose_right", 1.5),
+        ("approach_j4_right", 1.0),
+        ("approach_j3_right", 1.5),
+        ("grasp_right", 1.0),
+        ("move_back_J4_right", 1.5),
+        ("move_back_J1_right", 2.0),
+        ("release_right", 1.0)
     ]
 
     try:
@@ -76,19 +73,15 @@ def main(args=None):
             print("--- BƯỚC KHỞI ĐỘNG ---")
             print("  1. home_pose    (Gốc)")
             print("--- CHUỖI TIẾN VÀO GẮP ---")
-            print("  2. approach_j1  (Xoay J1)")
-            print("  3. approach_j4  (Hạ J4)")
-            print("  4. approach_j3  (Đẩy J3 ra)")
-            print("  5. grasp        (Đóng kẹp)")
+            print("  2. approach_j4  (Hạ J4)")
+            print("  3. approach_j3  (Đẩy J3 ra)")
+            print("  4. grasp        (Đóng kẹp)")
             print("--- CHUỖI RÚT VỀ ---")
-            print("  6. move_back_J4 (Nâng J4)")
-            print("  7. move_back_J3 (Rút J3 vào)")
-            print("  8. move_back_J1 (Xoay J1 về)")
-            print("--- CHUỖI LẮP RÁP ---")
-            print("  9. move_asem_J3 (Đẩy J3 ép vào)")
-            print("  10. release     (Mở kẹp)")
+            print("  5. move_back_J4 (Nâng J4)")
+            print("  6. move_back_J1 (Xoay J1 về)")
+            print("  7. release     (Mở kẹp)")
             print("-" * 50)
-            print("  11. 🤖 CHẠY TỰ ĐỘNG TOÀN BỘ CHU TRÌNH TRÊN")
+            print("  8. 🤖 CHẠY TỰ ĐỘNG TOÀN BỘ CHU TRÌNH TRÊN")
             print("  0. Thoát")
             print("="*50)
 
@@ -97,7 +90,7 @@ def main(args=None):
             if choice == '0':
                 break
                 
-            elif choice == '11':
+            elif choice == '8':
                 print("\n[MACRO] Bắt đầu chạy liên hoàn...")
                 for pose_name, duration in macro_sequence:
                     success = action_client.send_goal(pose_name, duration)
@@ -110,10 +103,13 @@ def main(args=None):
             else:
                 # Mapping các lựa chọn đơn lẻ
                 options = {
-                    '1': 'home_pose', '2': 'approach_j1', '3': 'approach_j4',
-                    '4': 'approach_j3', '5': 'grasp', '6': 'move_back_J4',
-                    '7': 'move_back_J3', '8': 'move_back_J1', '9': 'move_asem_J3',
-                    '10': 'release'
+                    '1': 'home_pose_right', 
+                    '2': 'approach_j4_right',
+                    '3': 'approach_j3_right', 
+                    '4': 'grasp_right', 
+                    '5': 'move_back_J4_right',
+                    '6': 'move_back_J1_right', 
+                    '7': 'release_right'
                 }
                 
                 if choice in options:

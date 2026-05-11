@@ -38,7 +38,8 @@ FIELD_CONFIGS = {
         'default_elevation': 0.0,
         'lat':               1.0,
         'post_ramp_yaw':    -90.0,
-        'tool_arm_side':    'right',   
+        'tool_arm_side':    'right',
+        'ai_target_id':     'class4',  # YOLO label của hộp R2REAL phía red
     },
     'blue': {
         'map_cols':          [1,     1,     1,  1,   2,     2,     2  , 2,     3,     3,     3, 3    ],
@@ -47,7 +48,8 @@ FIELD_CONFIGS = {
         'default_elevation': 0.0,
         'lat':              -1.0,
         'post_ramp_yaw':    90.0,
-        'tool_arm_side':    'left',  
+        'tool_arm_side':    'left',
+        'ai_target_id':     'class5',  # YOLO label của hộp R2REAL phía blue
     },
 }
 
@@ -93,66 +95,104 @@ def is_own_team_class(class_name, team_color):
     return class_name.endswith(f'-{suffix}')
 
 
+
 # ─────────────────────────────────────────────────────────────────────────────
-# Pick presets theo do chenh cao delta_h = h_target - h_curr (mm).
-#   delta > 0 : bac chua KFS CAO hon bac robot → voi LEN gap
-#   delta < 0 : bac chua KFS THAP hon bac robot → voi XUONG gap
-#   delta = 0 : cung bac → voi THANG
-#
-# Field stage heights = {200, 400, 600} mm → cac delta kha thi:
-#   -400, -200, 0, +200, +400
-#
-# Pose: [arm1, arm2, arm3, gripper] (4-DOF, dung MoveArmBehavior).
-# TODO: tune cac gia tri nay bang teleop_test_arm.py — hien tai ke thua tu
-# cap 'low'/'high' cu trong builders.py, can do thuc te tren tung bac.
+# Tuning parameters — tập trung tại đây để dễ chỉnh mà không cần mở từng file
 # ─────────────────────────────────────────────────────────────────────────────
-PICK_PRESETS_BY_DELTA = {
-    +400: {  # 200→600: voi len cao nhat
-        "home":      [   0.0,  -5.0,   0.0,  70.0],
-        "pre_grasp": [   0.0,  85.0,  -1.5,  70.0],
-        "extend":    [   0.0,  85.0,  -1.5,  70.0],
-        "close":     [   0.0,  85.0,  -1.5, -28.0],
-        "lift":      [   0.0,  10.0,   0.0, -28.0],
-        "retract":   [   0.0,  10.0,   0.0,  70.0],
-    },
-    +200: {  # 200→400 hoac 400→600: voi len trung binh (≈ preset 'low' cu)
-        "home":      [   0.0,  -5.0,   0.0,  70.0],
-        "pre_grasp": [   0.0,  70.0,  -0.5,  70.0],
-        "extend":    [   0.0,  70.0,  -0.5,  70.0],
-        "close":     [   0.0,  70.0,  -0.5, -28.0],
-        "lift":      [   0.0,   0.0,   0.0, -28.0],
-        "retract":   [   0.0,   0.0,   0.0,  70.0],
-    },
-    0: {     # cung bac: voi thang
-        "home":      [ 150.0,  -5.0,   0.0,  70.0],
-        "pre_grasp": [ 150.0,  35.0,   0.0,  70.0],
-        "extend":    [ 150.0,  35.0,   0.0,  70.0],
-        "close":     [ 150.0,  35.0,   0.0, -28.0],
-        "lift":      [ 150.0,   0.0,   0.0, -28.0],
-        "retract":   [ 150.0,   0.0,   0.0,  70.0],
-    },
-    -200: {  # 600→400 hoac 400→200: voi xuong trung binh (≈ preset 'high' cu)
-        "home":      [ 300.0,  -5.0,   0.0,  70.0],
-        "pre_grasp": [ 300.0,  55.0,   0.0,  70.0],
-        "extend":    [ 300.0,  55.0,   0.0,  70.0],
-        "close":     [ 300.0,  55.0,   0.0, -28.0],
-        "lift":      [ 300.0,   0.0,   0.0, -28.0],
-        "retract":   [ 300.0,   0.0,   0.0,  70.0],
-    },
-    -400: {  # 600→200: voi xuong sau nhat
-        "home":      [ 300.0,  -5.0,   0.0,  70.0],
-        "pre_grasp": [ 300.0,  75.0,   0.0,  70.0],
-        "extend":    [ 300.0,  75.0,   0.0,  70.0],
-        "close":     [ 300.0,  75.0,   0.0, -28.0],
-        "lift":      [ 300.0,   0.0,   0.0, -28.0],
-        "retract":   [ 300.0,   0.0,   0.0,  70.0],
-    },
+
+CLIMB_PARAMS = {
+    'up_velocity':      0.3,    # m/s — vận tốc khi leo LÊN bậc
+    'down_velocity':    0.1,    # m/s — vận tốc khi XUỐNG bậc
+    'pitch_threshold':  5.0,    # deg — ngưỡng phát hiện bắt đầu leo/xuống
+    'flat_threshold':   1.5,    # deg — ngưỡng xác nhận robot đã phẳng
+    'timeout_sec':      15.0,   # s   — timeout toàn bộ hành động leo bậc
+    'yaw_kp':           1.5,    # P-gain giữ thẳng hướng khi leo/xuống
+    'yaw_max_ang':      0.25,   # rad/s — clamp angular.z yaw lock
+}
+
+WALL_ALIGN_PARAMS = {
+    'kp_angular':           2.5,    # P-gain xoay phase 1
+    'kp_linear':            1.5,    # P-gain tiến phase 3
+    'ang_clamp':            0.1,    # rad/s — clamp angular.z phase 1
+    'lin_clamp':            0.2,    # m/s  — clamp linear.x phase 3
+    'tolerance_deg':        1.5,    # deg  — ngưỡng dừng phase 1 (vuông góc)
+    'tolerance_m':          0.01,   # m    — ngưỡng dừng phase 3 (khoảng cách)
+    'lidar_yaw_offset_deg': 90.0,   # deg  — offset góc LiDAR so với base_link
+}
+
+NAV_PARAMS = {
+    'flat_dist':            1.2,    # m   — khoảng cách di chuyển vào ô phẳng
+    'climb_dist':           0.3,    # m   — khoảng cách di chuyển sau khi leo bậc
+    'wall_window_deg':      20.0,   # deg — góc quét LiDAR khi wall align
+    'wall_dist_vision':     0.4,    # m   — goal_distance wall align trước khi bật AI
+    'wall_dist_climb':      0.3,    # m   — goal_distance wall align trước khi leo
+    'follow_dist_mm':       300.0,  # mm  — khoảng cách dừng khi FollowTarget
+    'align_timeout_sec':    5.0,    # s   — timeout WallAlignmentBehavior trong BT
+}
+
+TRACKING_PARAMS = {
+    'kp_linear_mm':     0.003,      # P-gain tiến (PHASE_APPROACH)
+    'kp_lateral':       0.0005,     # P-gain strafe (PHASE_ALIGN_X)
 }
 
 
-def closest_pick_preset(delta_h):
-    """Snap delta_h tuy y ve preset key gan nhat trong PICK_PRESETS_BY_DELTA.
-    Tra ve (key, preset_dict)."""
-    keys = sorted(PICK_PRESETS_BY_DELTA.keys())
-    nearest = min(keys, key=lambda k: abs(k - float(delta_h)))
-    return nearest, PICK_PRESETS_BY_DELTA[nearest]
+# ─────────────────────────────────────────────────────────────────────────────
+# Pick presets — dùng cho build_pick_and_place_sequence (đặt hộp lên giá TTT).
+# Chọn theo mode ('low' / 'high') VÀ số hộp đã ghi điểm (real_box_count):
+#   _1 → hộp đầu tiên  (arm1 nâng 300mm)
+#   _2 → hộp thứ hai   (arm1 nâng 500mm để tránh hộp đã đặt trước)
+# Pose: [arm1, arm2, arm3, gripper]
+# ─────────────────────────────────────────────────────────────────────────────
+PICK_PRESETS = {
+    'low_1': {
+        "home":      [   0.0,  -5.0,   0.0,  70.0],
+        "pre_grasp": [   0.0,  80.0,   0.0,  70.0],
+        "close":     [   0.0,  80.0,   0.0, -50.0],
+        "lift":      [ 250.0,  15.0,  90.0, -50.0],
+        "retract":   [ 250.0,   0.0,   0.0,  40.0],
+    },
+    'low_2': {
+        "home":      [   0.0,  -5.0,   0.0,  70.0],
+        "pre_grasp": [   0.0,  80.0,   0.0,  70.0],
+        "close":     [   0.0,  80.0,   0.0, -50.0],
+        "lift":      [ 500.0,  15.0,  90.0, -50.0],
+        "retract":   [ 500.0,   0.0,   0.0,  40.0],
+        "hold":      [ 500.0,   0.0,   0.0,   0.0],
+    },
+    'high_1': {
+        "home":      [ 300.0,  -5.0,   0.0,  70.0],
+        "pre_grasp": [ 300.0,  80.0,   0.0,  70.0],
+        "close":     [ 300.0,  80.0,   0.0, -50.0],
+        "lift":      [ 250.0,  15.0,  90.0, -50.0],
+        "retract":   [ 250.0,   0.0,   0.0,  40.0],
+    },
+    'high_2': {
+        "home":      [ 300.0,  -5.0,   0.0,  70.0],
+        "pre_grasp": [ 300.0,  80.0,   0.0,  70.0],
+        "close":     [ 300.0,  80.0,   0.0, -50.0],
+        "lift":      [ 500.0,  15.0,  90.0, -50.0],
+        "retract":   [ 500.0,   0.0,   0.0,  40.0],
+        "hold":      [ 500.0,   0.0,   0.0,   0.0],
+    },
+}
+
+# (step_name, preset_key, wait_sec) — hộp thứ nhất, không có bước hold
+PICK_STEPS_COUNT_1 = [
+    ("Home_1",    "home",      1.0),
+    ("Pre_Grasp", "pre_grasp", 1.0),
+    ("Close",     "close",     1.0),
+    ("Lift",      "lift",      1.0),
+    ("Retract",   "retract",   1.0),
+    ("Home_2",    "home",      0.0),
+]
+
+# Hộp thứ hai — thêm bước hold ở arm1=500mm để tránh va hộp đã đặt trước
+PICK_STEPS_COUNT_2 = [
+    ("Home_1",    "home",      1.0),
+    ("Pre_Grasp", "pre_grasp", 1.0),
+    ("Close",     "close",     1.0),
+    ("Lift",      "lift",      1.0),
+    ("Retract",   "retract",   1.0),
+    ("Hold",      "hold",      2.0),
+    ("Home_2",    "home",      0.0),
+]

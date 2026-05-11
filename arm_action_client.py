@@ -18,14 +18,13 @@ class PickPlaceClient(Node):
         # Dữ liệu vị trí: [Arm1 (mm), Arm2 (Độ), Arm3 (Độ), Gripper (Độ)]
         # Action Server sẽ tự động lo việc chuyển đổi sang hệ Mét và Radian.
         self.presets = {
-            "initial": [230.0, 0.0, 0.0, 40.0],
-            "home": [230.0, 0.0, 0.0, 40.0],
-            "pos1": [230.0, 80.0, 00.0, 75.0], # tiep can muc tieu
-            "pos2": [230.0, 80.0, -10.0, 75.0],   # dua tay kep vao vat
-            "pos3": [230.0, 80.0, 0.0, 10.0],    # kep vat
-            "pos4": [230.0, 80.0, 90.0, 10.0],  # 
-            "pos5": [230.0, 0.0, 90.0, 10.0],  # vao vi tri tha va
-            "pos6": [230.0, 0.0, 90.0, 40.0],  # tha vat
+            "initial": [380.0, 0.0, 0.0, 50.0],
+            "home": [420.0, 0.0, 90.0, 50.0],
+            "pos1": [640.0, 0.0, 90.0, 50.0], # arm 1 len cao, mở kẹp
+            "pos2": [640.0, 0.0, 90.0, -20.0],   # kep vat
+            "pos3": [780.0, 0.0, -40.0, -20.0],  # nâng lên,
+            "pos4": [780.0, 0.0, -70.0, -20.0],  #
+            "pos5": [780.0, 0.0, -70.0, 50.0],  # tha vat
         }
 
     # ==============================
@@ -101,7 +100,6 @@ class PickPlaceClient(Node):
             "pos3",  # nâng lên
             "pos4",  # di chuyển
             "pos5",
-            "pos6",  # thả vật
             "home"
         ]
 
@@ -113,7 +111,7 @@ class PickPlaceClient(Node):
                 return
 
             # Dừng một nhịp ngắn (1s) giữa mỗi động tác để tay máy ổn định rung lắc
-            time.sleep(1.0) 
+            time.sleep(3.0) 
 
         self.get_logger().info("=== HOÀN TẤT CHU KỲ ===\n")
 
@@ -127,6 +125,7 @@ def main(args=None):
             node.run_cycle()
             node.get_logger().info("Nghỉ 3 giây trước khi lặp lại...")
             time.sleep(3.0)  # Thời gian chờ giữa các chu kỳ
+            break  # Xóa dòng này nếu muốn chạy liên tục không dừng
             
     except KeyboardInterrupt:
         node.get_logger().info("\nNhận lệnh CTRL+C, đang tắt Client an toàn...")

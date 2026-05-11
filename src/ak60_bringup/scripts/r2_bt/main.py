@@ -5,7 +5,7 @@ import rclpy
 from rclpy.node import Node
 import py_trees
 import py_trees_ros
-from r2_bt.trees.mission import create_tree
+from r2_bt.trees.mission_test import create_tree
 from r2_bt.config import FIELD_CONFIGS
 
 
@@ -14,6 +14,8 @@ def bt_ticker_thread(node, tree):
     while rclpy.ok():
         tree.tick()
         print(py_trees.display.ascii_tree(tree.root, show_status=True))
+        print("-" * 20 + " BLACKBOARD " + "-" * 20)
+        print(py_trees.display.unicode_blackboard())
         time.sleep(0.1)
 
 

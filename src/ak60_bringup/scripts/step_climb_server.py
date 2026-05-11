@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
+import sys
+import os
 import rclpy
-import time  # Thay đổi: Import thư viện time mặc định
+import time
 import math
 from rclpy.action import ActionServer, CancelResponse
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 
-# Import Action của bạn
-from ak60_bringup.action import ClimbStep 
+from ak60_bringup.action import ClimbStep
+
+_SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+from r2_bt.config import CLIMB_PARAMS
 
 class StepClimbServer(Node):
     def __init__(self):
@@ -21,6 +27,7 @@ class StepClimbServer(Node):
             self, ClimbStep, 'climb_step', self.execute_callback)
         
         self.current_pitch = 0.0
+        self.current_yaw = 0.0
         self.get_logger().info('Action Server Leo Bậc (Odometry & Math) đã sẵn sàng!')
 
     def odom_callback(self, msg):
@@ -28,13 +35,15 @@ class StepClimbServer(Node):
         y = msg.pose.pose.orientation.y
         z = msg.pose.pose.orientation.z
         w = msg.pose.pose.orientation.w
-        
+
         sinp = 2.0 * (w * y - z * x)
         if abs(sinp) >= 1:
-            pitch_rad = math.copysign(math.pi / 2, sinp) 
+            pitch_rad = math.copysign(math.pi / 2, sinp)
         else:
             pitch_rad = math.asin(sinp)
         self.current_pitch = math.degrees(pitch_rad)
+
+        self.current_yaw = math.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
 
     # Thay đổi: Bỏ chữ "async" trước def
     def execute_callback(self, goal_handle):
@@ -45,13 +54,17 @@ class StepClimbServer(Node):
         result = ClimbStep.Result()
         
         stage = 0
-        pitch_threshold = 5.0  
-        flat_threshold = 1.5   
+        pitch_threshold = CLIMB_PARAMS['pitch_threshold']
+        flat_threshold  = CLIMB_PARAMS['flat_threshold']
+        KP_YAW  = CLIMB_PARAMS['yaw_kp']
+        MAX_ANG = CLIMB_PARAMS['yaw_max_ang']
+
+        initial_yaw = self.current_yaw
         move_cmd = Twist()
         move_cmd.linear.x = target_vel
 
         start_time = self.get_clock().now()
-        timeout_sec = 15.0 
+        timeout_sec = CLIMB_PARAMS['timeout_sec']
 
         try:
             while rclpy.ok():
@@ -70,16 +83,20 @@ class StepClimbServer(Node):
                     result.success = False
                     return result
 
-                # 3. Điều khiển & Feedback
+                # 3. Yaw lock: bù góc lệch so với hướng ban đầu
+                yaw_err = (initial_yaw - self.current_yaw + math.pi) % (2 * math.pi) - math.pi
+                move_cmd.angular.z = max(-MAX_ANG, min(MAX_ANG, KP_YAW * yaw_err))
+
+                # 4. Điều khiển & Feedback
                 self._cmd_vel_pub.publish(move_cmd)
                 feedback_msg.current_pitch = self.current_pitch
                 goal_handle.publish_feedback(feedback_msg)
 
-                # 4. Logic leo bậc
+                # 5. Logic leo bậc
                 if stage == 0:
                     if abs(self.current_pitch) > pitch_threshold:
                         stage = 1
-                        self.get_logger().info(f'Phát hiện leo bậc: Pitch = {self.current_pitch:.2f}')
+                        self.get_logger().info(f'Phát hiện leo bậc: Pitch = {self.current_pitch:.2f}°, Yaw lock = {math.degrees(initial_yaw):.1f}°')
                 elif stage == 1:
                     if abs(self.current_pitch) < flat_threshold:
                         self.get_logger().info('Đã vượt qua bậc. Robot đã phẳng.')
@@ -87,8 +104,7 @@ class StepClimbServer(Node):
                         result.success = True
                         return result
 
-                # Thay đổi: Dùng time.sleep() mặc định thay vì asyncio
-                time.sleep(0.05) 
+                time.sleep(0.05)
 
         finally:
             self._stop_robot()

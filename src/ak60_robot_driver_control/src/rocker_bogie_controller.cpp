@@ -209,53 +209,14 @@ controller_interface::return_type RockerBogieController::update(
   current_vy_ = ramp(target_vy, current_vy_, step_lin);
   current_wz_ = ramp(target_wz, current_wz_, step_ang);
 
-  // =============================
-  // STATE TRANSITION
-  // =============================
-  double speed_xy = std::hypot(current_vx_, current_vy_);
-
-  bool want_rotate = std::abs(current_wz_) > enter_rotate_wz_;
-  bool stop_rotate = std::abs(current_wz_) < exit_rotate_wz_;
-
-  bool moving = speed_xy > enter_move_speed_;
-  bool stopped = speed_xy < exit_move_speed_;
-
-  bool lateral = std::abs(current_vy_) > 0.05 && std::abs(current_vx_) < 0.025;
-
-  switch (state_)
-  {
-    case SteerState::IDLE:
-      if (want_rotate) state_ = SteerState::ROTATE;
-      else if (moving) state_ = SteerState::ALIGN;
-      break;
-
-    case SteerState::ALIGN:
-      if (want_rotate) state_ = SteerState::ROTATE;
-      else if (lateral) state_ = SteerState::LATERAL;
-      else if (moving) state_ = SteerState::DRIVE;
-      else state_ = SteerState::IDLE;
-      break;
-
-    case SteerState::DRIVE:
-      if (want_rotate) state_ = SteerState::ROTATE;
-      else if (lateral) state_ = SteerState::LATERAL;
-      else if (stopped) state_ = SteerState::IDLE;
-      break;
-
-    case SteerState::LATERAL:
-      if (want_rotate) state_ = SteerState::ROTATE;
-      else if (!lateral) state_ = SteerState::DRIVE;
-      break;
-
-    case SteerState::ROTATE:
-      if (stop_rotate)
-        state_ = moving ? SteerState::DRIVE : SteerState::IDLE;
-      break;
-  }
-
   // ==========================================================
   // 4. INVERSE KINEMATICS VẠN NĂNG (BẢN FIX URDF LIMITS)
   // ==========================================================
+
+  double raw_speeds[6];
+  double target_steers[6];
+  double max_steer_error = 0.0; // Dùng để tính hệ số đồng bộ chung sau này
+
   for (int i = 0; i < 6; ++i)
   {
     double x = wheel_coords_[i][0];
@@ -303,14 +264,25 @@ controller_interface::return_type RockerBogieController::update(
 
       // 4. TÍNH SAI SỐ GÓC SAU KHI ĐÃ ÉP LIMIT
       double err = std::abs(atan2(sin(target_steer - current), cos(target_steer - current)));
-
-      // 5. CHỜ BÁNH XE XOAY XONG MỚI CHẠY (Anti-Slip)
-      double steer_scale = std::clamp(1.0 - (err / (M_PI / 4.0)), 0.0, 1.0);
-      speed *= steer_scale;
+      if (err > max_steer_error) {
+          max_steer_error = err;
+      }
     }
 
-    cmd_vel_[i]->set_value(speed);
-    cmd_steer_[i]->set_value(target_steer);
+    // Lưu tạm tốc độ thô và góc đích vào mảng
+    raw_speeds[i] = speed;
+    target_steers[i] = target_steer;
+  }
+
+  // --- BƯỚC CHUYỂN TIẾP: TÍNH HỆ SỐ ĐỒNG BỘ CHUNG (GLOBAL SYNC) ---
+  // Toàn bộ 6 bánh sẽ dùng chung một tỷ lệ giảm tốc độ dựa trên bánh bị lệch nặng nhất
+  double global_steer_scale = std::clamp(1.0 - (max_steer_error / (M_PI / 4.0)), 0.0, 1.0);
+
+  // --- VÒNG LẶP 2: XUẤT LỆNH XUỐNG ĐỘNG CƠ CÙNG LÚC ---
+  for (int i = 0; i < 6; ++i)
+  {
+    cmd_vel_[i]->set_value(raw_speeds[i] * global_steer_scale);
+    cmd_steer_[i]->set_value(target_steers[i]);
   }
 
   return controller_interface::return_type::OK;

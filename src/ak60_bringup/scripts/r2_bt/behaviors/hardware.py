@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
+import time
 import py_trees
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from action_msgs.msg import GoalStatus
 from ak60_bringup.action import WallAlignment, FollowTarget, MoveArm, ArmSequence
-import time
 
-from r2_bt.blackboard import bb
 
 class WallAlignmentBehavior(py_trees.behaviour.Behaviour):
     def __init__(self, name, ros_node, window_degrees, goal_distance, timeout_sec= 5.0):
@@ -79,6 +78,9 @@ class MoveArmBehavior(py_trees.behaviour.Behaviour):
         self.client = ActionClient(self.ros_node, MoveArm, 'move_arm')
         self.goal_handle = self.goal_future = self.result_future = None
 
+        self.blackboard = self.attach_blackboard_client(name=name)
+        self.blackboard.register_key(key="current_arm1_z", access=py_trees.common.Access.READ)
+
     def setup(self, **kwargs): return self.client.wait_for_server(timeout_sec=5.0)
 
     def initialise(self):
@@ -87,7 +89,7 @@ class MoveArmBehavior(py_trees.behaviour.Behaviour):
 
         arm1_val = self.target[0]
         if arm1_val == "auto":
-            arm1_val = bb.get("current_arm1_z", 125.0)
+            arm1_val = self.blackboard.current_arm1_z if self.blackboard.exists("current_arm1_z") else 125.0
 
         goal_msg.arm1, goal_msg.arm2, goal_msg.arm3, goal_msg.gripper = float(arm1_val), float(self.target[1]), float(self.target[2]), float(self.target[3])
         self.goal_future = self.client.send_goal_async(goal_msg)
@@ -189,19 +191,31 @@ class FollowTargetBehavior(py_trees.behaviour.Behaviour):
         
         self.goal_handle = self.goal_future = self.result_future = None
         self.start_time = None
+        self._real_detected = False
 
     def setup(self, **kwargs): 
         return self.client.wait_for_server(timeout_sec=5.0)
+    
+    def _feedback_cb(self, feedback_msg):
+        # Feedback co field tracking_state ("real" / "fake" / "empty") tu tracking_server.
+        state = getattr(feedback_msg.feedback, 'tracking_state', '').upper()
+        if state == "REAL" and not self._real_detected:
+            self._real_detected = True
+            self.blackboard.latest_box_detection = "REAL"
+            self.ros_node.get_logger().info(
+                f"[{self.name}] ✅ Feedback REAL → lock blackboard latest_box_detection='REAL'"
+            )
 
     def initialise(self):
         self.goal_handle = self.goal_future = self.result_future = None
         self.start_time = self.ros_node.get_clock().now()  # Bấm giờ
+        self._real_detected = False
         
         self.ros_node.get_logger().info(f"[{self.name}] 👁️ Tìm mục tiêu ID={self.target_id}...")
         goal_msg = FollowTarget.Goal()
         goal_msg.target_id = self.target_id
         goal_msg.desired_distance_mm = float(self.desired_distance_mm)
-        self.goal_future = self.client.send_goal_async(goal_msg)
+        self.goal_future = self.client.send_goal_async(goal_msg, feedback_callback=self._feedback_cb)
 
     def update(self):
         # 1. CƠ CHẾ TIMEOUT CHỐNG KẸT
@@ -233,9 +247,13 @@ class FollowTargetBehavior(py_trees.behaviour.Behaviour):
         result = self.result_future.result()
         tracking_status = result.result.message.upper()
         
-        # SỬ DỤNG TRỰC TIẾP THUỘC TÍNH ĐÃ REGISTER
-        self.blackboard.latest_box_detection = tracking_status
-        self.ros_node.get_logger().info(f"[{self.name}] 🧠 AI trả về: {tracking_status}")
+        if not self._real_detected or tracking_status == "REAL":
+            self.blackboard.latest_box_detection = tracking_status
+            self.ros_node.get_logger().info(f"[{self.name}] 🧠 AI trả về: {tracking_status}")
+        else:
+            self.ros_node.get_logger().info(
+                f"[{self.name}] 🧠 AI trả về: {tracking_status} (giu blackboard='REAL' tu feedback)"
+            )
         
         return (py_trees.common.Status.SUCCESS
                 if result.status == GoalStatus.STATUS_SUCCEEDED and tracking_status == "REAL"

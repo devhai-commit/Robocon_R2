@@ -14,8 +14,15 @@ import tf_transformations
 
 import math
 import time
+import sys
+import os
 
 from ak60_bringup.action import WallAlignment
+
+_SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+from r2_bt.config import WALL_ALIGN_PARAMS
 
 class WallAlignmentServer(Node):
     def __init__(self):
@@ -48,13 +55,11 @@ class WallAlignmentServer(Node):
         self.current_y = 0.0
         self.current_yaw = 0.0
         
-        # Thông số P-Controller
-        self.kp_angular = 2.5
-        self.kp_linear = 1.5
-        self.tolerance_deg = 1.5 
-        self.tolerance_m = 0.01  
-
-        self.lidar_yaw_offset_deg = 90.0 
+        self.kp_angular           = WALL_ALIGN_PARAMS['kp_angular']
+        self.kp_linear            = WALL_ALIGN_PARAMS['kp_linear']
+        self.tolerance_deg        = WALL_ALIGN_PARAMS['tolerance_deg']
+        self.tolerance_m          = WALL_ALIGN_PARAMS['tolerance_m']
+        self.lidar_yaw_offset_deg = WALL_ALIGN_PARAMS['lidar_yaw_offset_deg']
 
         self.get_logger().info('Action Server [Align -> Snap Yaw -> Approach] Đã sẵn sàng!')
 
@@ -169,7 +174,8 @@ class WallAlignmentServer(Node):
                     break
 
                 cmd.angular.z = -self.kp_angular * math.radians(dev_deg)
-                cmd.angular.z = max(min(cmd.angular.z, 0.1), -0.1) 
+                clamp = WALL_ALIGN_PARAMS['ang_clamp']
+                cmd.angular.z = max(min(cmd.angular.z, clamp), -clamp)
                 self.cmd_pub.publish(cmd)
                 
                 loop_rate.sleep() # Thay thế time.sleep(0.05)
