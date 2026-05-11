@@ -21,7 +21,7 @@ class IntegratedTrackingServer(Node):
         super().__init__('integrated_tracking_server')
         
         self.cb_group = ReentrantCallbackGroup()
-        self.enable_gui = False  # Cờ bật/tắt GUI (có thể điều chỉnh qua tham số ROS nếu muốn)
+        self.enable_gui = True  # Cờ bật/tắt GUI (có thể điều chỉnh qua tham số ROS nếu muốn)
 
         self.get_logger().info("Đang nạp lõi YOLOv8 TensorRT...")
         self.model = YOLO('/home/robocon/ros_ws/yolo26n_best.engine', task='detect') 

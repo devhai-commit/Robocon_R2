@@ -192,6 +192,22 @@ class IsAtExitCellCondition(py_trees.behaviour.Behaviour):
         )
 
 
+class CheckBlackboardValue(py_trees.behaviour.Behaviour):
+    def __init__(self, name, variable_name, expected_value, op=operator.eq):
+        super().__init__(name)
+        self.variable_name = variable_name
+        self.expected_value = expected_value
+        self.op = op
+        self.blackboard = self.attach_blackboard_client(name=name)
+        self.blackboard.register_key(key=variable_name, access=py_trees.common.Access.READ)
+
+    def update(self):
+        val = _safe_get(self.blackboard, self.variable_name)
+        if val is not None and self.op(val, self.expected_value):
+            return py_trees.common.Status.SUCCESS
+        return py_trees.common.Status.FAILURE
+
+
 class KeepRunningUntilSuccess(py_trees.decorators.Decorator):
     def __init__(self, name, child):
         super().__init__(name=name, child=child)

@@ -45,7 +45,7 @@ class IsClimbingUpCondition(py_trees.behaviour.Behaviour):
         super().__init__(name)
         self.ros_node = ros_node
         self.elevation_map = {}
-        self.default_elevation = 0.0
+        self.default_elevation = 400.0
 
     def setup(self, **kwargs):
         cols    = self.ros_node.get_parameter('map_cols').value
@@ -71,7 +71,7 @@ class HasElevationChangeCondition(py_trees.behaviour.Behaviour):
         super().__init__(name)
         self.ros_node = ros_node
         self.elevation_map = {}
-        self.default_elevation = 0.0
+        self.default_elevation = 400.0
 
     def setup(self, **kwargs):
         cols    = self.ros_node.get_parameter('map_cols').value
@@ -100,7 +100,7 @@ class DynamicClimbStepBehavior(py_trees.behaviour.Behaviour):
         self.goal_future = self.result_future = self.goal_handle = None
         self.needs_climb = False
         self.elevation_map = {}
-        self.default_elevation = 0.0
+        self.default_elevation = 400.0
 
     def setup(self, **kwargs):
         cols    = self.ros_node.get_parameter('map_cols').value
@@ -126,7 +126,7 @@ class DynamicClimbStepBehavior(py_trees.behaviour.Behaviour):
 
         self.needs_climb = True
         goal_msg = ClimbStep.Goal()
-        goal_msg.velocity = 0.3 if delta_h > 0 else 0.1
+        goal_msg.velocity = 0.3 if delta_h > 0 else 0.3
         self.goal_future = self.client.send_goal_async(goal_msg)
 
     def update(self):

@@ -32,22 +32,22 @@ def build_tool_assembly_sequence(ros_node, side='left'):
 _PICK_PRESETS = {
     # Robot ở bậc THẤP hơn — gắp lên (arm2 nhỏ, tay hướng về phía trước/lên)
     'low': {
-        "home":      [ 325.0,  -5.0,   0.0,  70.0],
-        "pre_grasp": [ 325.0,  75.0,   0.0,  70.0],
-        "extend":    [ 325.0,  75.0,   0.0,  70.0],
-        "close":     [ 325.0,  75.0,   0.0, -50.0],
-        "lift":      [ 325.0,   0.0,   80.0, -50.0],
-        "retract":   [ 325.0,   0.0,   0.0,  70.0],
+        "home":      [ 0.0,  -5.0,  0.0,  70.0],
+        "pre_grasp": [ 0.0,  70.0, -0.5,  70.0],
+        "extend":    [ 0.0,  70.0, -0.5,  70.0],
+        "close":     [ 0.0,  70.0, -0.5, -28.0],
+        "lift":      [ 0.0,   0.0,  0.0, -28.0],
+        "retract":   [ 0.0,   0.0,  0.0,  70.0],
     },
     # Robot ở bậc CAO hơn — gắp xuống (arm2 lớn hơn, arm3 âm hơn để cúi xuống)
     # TODO: tune các giá trị này bằng teleop_test_arm.py
     'high': {
-        "home":      [ 325.0,  -5.0,   0.0,  70.0],
-        "pre_grasp": [ 325.0,  75.0,   0.0,  70.0],
-        "extend":    [ 325.0,  75.0,   0.0,  70.0],
-        "close":     [ 325.0,  75.0,   0.0, -50.0],
-        "lift":      [ 325.0,   0.0,   80.0, -50.0],
-        "retract":   [ 325.0,   0.0,   0.0,  70.0],
+        "home":      [ 300.0,  -5.0,   0.0,  70.0],
+        "pre_grasp": [ 300.0,  55.0,   0.0,  70.0],
+        "extend":    [ 300.0,  55.0,   0.0,  70.0],
+        "close":     [ 300.0,  55.0,   0.0, -28.0],
+        "lift":      [ 300.0,   0.0,   0.0, -28.0],
+        "retract":   [ 300.0,   0.0,   0.0,  70.0],
     },
 }
 
@@ -56,8 +56,8 @@ _PICK_STEPS = [
     ("Pre_Grasp", "pre_grasp", 1.5),
     ("Extend",    "extend",    1.0),
     ("Close",     "close",     1.0),
-    ("Lift",      "lift",      2.0),
-    ("Retract",   "retract",   1.0),
+    ("Lift",      "lift",      1.5),
+    ("Retract",   "retract",   1.5),
     ("Home_2",    "home",      0.0),
 ]
 
@@ -93,7 +93,7 @@ def build_move_subtree(ros_node):
 
     subtree.add_child(py_trees.decorators.FailureIsSuccess(
         "Run_AI",
-        FollowTargetBehavior("Run_AI_ID1", ros_node, target_id="class5", desired_distance_mm=295.0),
+        FollowTargetBehavior("Run_AI_ID1", ros_node, target_id="class5", desired_distance_mm=280.0),
     ))
 
     box_selector = py_trees.composites.Selector("Box_Logic", memory=False)

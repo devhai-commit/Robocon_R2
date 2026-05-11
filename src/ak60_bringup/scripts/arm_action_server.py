@@ -95,7 +95,7 @@ class RobotArmActionServer(Node):
             self.clamp(goal.arm1, 0.0, 760.0),
             self.clamp(goal.arm2, -10.0, 90.0),
             self.clamp(goal.arm3, -90.0, 90.0),
-            self.clamp(goal.gripper, -20.0, 90.0)
+            self.clamp(goal.gripper, 0.0, 90.0)
         ]
 
         feedback_msg = MoveArm.Feedback()
