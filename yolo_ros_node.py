@@ -13,7 +13,7 @@ class YoloTensorRTNode(Node):
         # 1. Nạp vũ khí hạng nặng TensorRT
         self.get_logger().info("Đang nạp lõi YOLOv8 TensorRT...")
         # Lưu ý: Thay đổi đường dẫn nếu file .engine của bạn nằm ở chỗ khác
-        self.model = YOLO('/home/robocon/ros_ws/yolo26n_best.engine', task='detect') 
+        self.model = YOLO('/home/robocon/ros_ws/yolo26s_best.engine', task='detect') 
         
         # 2. Tạo kênh phát sóng (Publisher)
         self.publisher_ = self.create_publisher(Point, '/target_coordinates', 10)

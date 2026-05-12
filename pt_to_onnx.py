@@ -16,7 +16,8 @@ torch.onnx.export = patched_export
 # 4. Tiến hành load và export bình thường
 if __name__ == "__main__":
     print("Bắt đầu export sang ONNX với bản vá lỗi dynamo...")
-    model = YOLO("/home/robocon/ros_ws/yolo26n_best.pt")
+
+    model = YOLO("/home/robocon/yolo26s_best.pt")
     
     # Export với kích thước ảnh cố định để tối ưu hóa tốt nhất cho phần cứng
     model.export(format="onnx", opset=12, imgsz=640)
@@ -24,6 +25,6 @@ if __name__ == "__main__":
 
 
 # /usr/src/tensorrt/bin/trtexec 
-# --onnx=/home/robocon/ros_ws/yolo26n_best.onnx 
-# --saveEngine=/home/robocon/ros_ws/yolo26n_best.engine 
+# --onnx=/home/robocon/yolo26s_best.onnx 
+# --saveEngine=/home/robocon/ros_ws/yolo26s_best.engine 
 # --fp16
