@@ -103,6 +103,27 @@ class DecideNextGridCellAction(py_trees.behaviour.Behaviour):
         self.blackboard.register_key(key="target_boxes_list", access=py_trees.common.Access.READ)
         self.blackboard.register_key(key="target_cell", access=py_trees.common.Access.WRITE)
 
+    def _drop_completed_target(self, target_boxes, grid_status, curr_pos):
+        if not target_boxes or target_boxes[0] != curr_pos:
+            return target_boxes
+
+        cell_state = grid_status.get(curr_pos, {})
+        if cell_state.get('visited') or cell_state.get('scanned'):
+            return target_boxes[1:]
+        return target_boxes
+
+    def _choose_step_toward(self, accessible_neighbors, target_cell):
+        if not target_cell:
+            return None
+        return min(
+            accessible_neighbors,
+            key=lambda cell: (
+                manhattan_distance(cell[0], cell[1], target_cell[0], target_cell[1]),
+                cell[1],
+                cell[0],
+            ),
+        )
+
     def update(self):
         curr_c, curr_r = self.blackboard.robot_pos
         grid_status = self.blackboard.grid_status or {}
@@ -125,15 +146,17 @@ class DecideNextGridCellAction(py_trees.behaviour.Behaviour):
             return py_trees.common.Status.FAILURE
         unvisited = [n for n in accessible_neighbors if not grid_status[n]['visited']]
 
+        if t_boxes:
+            updated_boxes = self._drop_completed_target(t_boxes, grid_status, (curr_c, curr_r))
+            if updated_boxes != t_boxes:
+                self.blackboard.target_boxes_list = list(updated_boxes)
+                t_boxes = updated_boxes
+
         target_cell = None
         if self.mode == "EXPLORE":
-            # Nếu có route config trước, theo thứ tự trong t_boxes (không sort lại)
             if t_boxes:
-                target_cell = next(
-                    (cell for cell in t_boxes if cell in unvisited),
-                    None,
-                )
-            if target_cell is None and any(n[0] == p_col for n in unvisited):
+                target_cell = self._choose_step_toward(accessible_neighbors, t_boxes[0])
+            elif any(n[0] == p_col for n in unvisited):
                 target_cell = sorted(
                     [n for n in unvisited if n[0] == p_col],
                     key=lambda n: n[1], reverse=True,
