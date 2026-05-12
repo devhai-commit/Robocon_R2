@@ -86,7 +86,7 @@ class OdomNavSwerveServer(Node):
 
         # --- Cấu hình tham số ---
         dist_tolerance = 0.05
-        yaw_tolerance = 0.05  
+        yaw_tolerance = 2.0 * math.pi / 180.0  # 2 độ  
         kp_xy = 1.5
         kp_angular = 1.0
         max_vel_xy = 0.6
@@ -100,7 +100,7 @@ class OdomNavSwerveServer(Node):
         # ========================================================
         # GIAI ĐOẠN 1: ĐI NGANG HOLONOMIC
         # ========================================================
-        self.get_logger().info('Giai đoạn 1: Đi ngang Holonomic đến mục tiêu...')
+        self.get_logger().info('Giai đoạn 1: Đi Holonomic đến mục tiêu...')
         while rclpy.ok():
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
@@ -150,6 +150,7 @@ class OdomNavSwerveServer(Node):
         # ========================================================
         # GIAI ĐOẠN 2: XOAY TẠI CHỖ
         # ========================================================
+        
         self.get_logger().info('Giai đoạn 2: Đã tới vị trí, Đang xoay tại chỗ...')
         while rclpy.ok():
             if goal_handle.is_cancel_requested:
