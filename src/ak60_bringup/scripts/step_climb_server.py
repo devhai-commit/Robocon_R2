@@ -27,7 +27,6 @@ class StepClimbServer(Node):
             self, ClimbStep, 'climb_step', self.execute_callback)
         
         self.current_pitch = 0.0
-        # self.current_yaw = 0.0
         self.get_logger().info('Action Server Leo Bậc (Odometry & Math) đã sẵn sàng!')
 
     def odom_callback(self, msg):
@@ -43,8 +42,6 @@ class StepClimbServer(Node):
             pitch_rad = math.asin(sinp)
         self.current_pitch = math.degrees(pitch_rad)
 
-        # self.current_yaw = math.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
-
     # Thay đổi: Bỏ chữ "async" trước def
     def execute_callback(self, goal_handle):
         self.get_logger().info('Nhận lệnh leo bậc. Bắt đầu di chuyển...')
@@ -52,14 +49,11 @@ class StepClimbServer(Node):
         target_vel = goal_handle.request.velocity
         feedback_msg = ClimbStep.Feedback()
         result = ClimbStep.Result()
-        
+
         stage = 0
         pitch_threshold = CLIMB_PARAMS['pitch_threshold']
         flat_threshold  = CLIMB_PARAMS['flat_threshold']
-        KP_YAW  = CLIMB_PARAMS['yaw_kp']
-        MAX_ANG = CLIMB_PARAMS['yaw_max_ang']
 
-        # initial_yaw = self.current_yaw
         move_cmd = Twist()
         move_cmd.linear.x = target_vel
 
@@ -83,11 +77,7 @@ class StepClimbServer(Node):
                     result.success = False
                     return result
 
-                # 3. Yaw lock: bù góc lệch so với hướng ban đầu
-                # yaw_err = (initial_yaw - self.current_yaw + math.pi) % (2 * math.pi) - math.pi
-                # move_cmd.angular.z = max(-MAX_ANG, min(MAX_ANG, KP_YAW * yaw_err))
-
-                # 4. Điều khiển & Feedback
+                # 3. Điều khiển & Feedback
                 self._cmd_vel_pub.publish(move_cmd)
                 feedback_msg.current_pitch = self.current_pitch
                 goal_handle.publish_feedback(feedback_msg)

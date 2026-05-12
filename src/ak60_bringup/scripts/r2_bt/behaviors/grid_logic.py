@@ -127,10 +127,13 @@ class DecideNextGridCellAction(py_trees.behaviour.Behaviour):
 
         target_cell = None
         if self.mode == "EXPLORE":
-            target_neighbors = [n for n in unvisited if n in t_boxes]
-            if target_neighbors:
-                target_cell = sorted(target_neighbors, key=lambda n: (n[1], n[0]), reverse=True)[0]
-            elif any(n[0] == p_col for n in unvisited):
+            # Nếu có route config trước, theo thứ tự trong t_boxes (không sort lại)
+            if t_boxes:
+                target_cell = next(
+                    (cell for cell in t_boxes if cell in unvisited),
+                    None,
+                )
+            if target_cell is None and any(n[0] == p_col for n in unvisited):
                 target_cell = sorted(
                     [n for n in unvisited if n[0] == p_col],
                     key=lambda n: n[1], reverse=True,

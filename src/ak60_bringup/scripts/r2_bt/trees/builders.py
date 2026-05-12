@@ -81,21 +81,20 @@ def build_move_subtree(ros_node, ai_target_id='class5'):
     """Subtree xử lý một bước vào ô lưới: quay hướng → vision → leo/di chuyển."""
     subtree = py_trees.composites.Sequence("Process_And_Enter_Cell", memory=True)
 
-    # subtree.add_child(GoToRelativePoseBehavior("Lui_Truoc_Khi_Xoay", ros_node, dx=-0.1, dy=0.0, target_yaw_deg=0.0))
     subtree.add_child(TurnToTargetCellBehavior("Turn_To_Face_Cell", ros_node))
 
-    subtree.add_child(py_trees.decorators.FailureIsSuccess(
-        "Ignore_Align_1",
-        py_trees.decorators.Timeout(
-            "Align_1_Timeout",
-            WallAlignmentBehavior(
-                "Align_Before_Vision", ros_node,
-                window_degrees=NAV_PARAMS['wall_window_deg'],
-                goal_distance=NAV_PARAMS['wall_dist_vision'],
-            ),
-            duration=NAV_PARAMS['align_timeout_sec'],
-        ),
-    ))
+    # subtree.add_child(py_trees.decorators.FailureIsSuccess(
+    #     "Ignore_Align_1",
+    #     py_trees.decorators.Timeout(
+    #         "Align_1_Timeout",
+    #         WallAlignmentBehavior(
+    #             "Align_Before_Vision", ros_node,
+    #             window_degrees=NAV_PARAMS['wall_window_deg'],
+    #             goal_distance=NAV_PARAMS['wall_dist_vision'],
+    #         ),
+    #         duration=NAV_PARAMS['align_timeout_sec'],
+    #     ),
+    # ))
 
     subtree.add_child(py_trees.decorators.FailureIsSuccess(
         "Run_AI",

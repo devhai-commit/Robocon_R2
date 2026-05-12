@@ -109,20 +109,6 @@ def _build_main_mission(ros_node, lat, post_ramp_yaw, side, ai_target_id):
     main.add_child(init_seq)
 
 
-    # main.add_child(py_trees.decorators.FailureIsSuccess(
-    #     "Ignore_Align_Exit",
-    #     WallAlignmentBehavior("Align_Cua_Cell", ros_node, window_degrees=20.0, goal_distance=0.5, timeout_sec=10.0),))
-    # main.add_child(py_trees.decorators.FailureIsSuccess(
-    #     "Run_AI",
-    #     FollowTargetBehavior("Run_AI_ID1", ros_node, target_id="class5", desired_distance_mm=500.0)))
-
-    # main.add_child(py_trees.decorators.FailureIsSuccess(
-    #     "Ignore_Align_Enter_Cell",
-    #     WallAlignmentBehavior("Align_after_AI", ros_node, window_degrees=20.0, goal_distance=0.1, timeout_sec=10.0),))
-
-    # main.add_child(build_pick_and_place_sequence(ros_node, mode='high'))
-    # main.add_child(IncrementRealCountAction("Add_Score_Initial"))
-
     # --- Phase 3: Thoát khỏi sàn ---
 
     exit_seq = py_trees.composites.Sequence("Chuoi_Thoat_Khoi_San", memory=True)
