@@ -125,15 +125,15 @@ class TurnToTargetCellBehavior(py_trees.behaviour.Behaviour):
         elif target_r > curr_r: default_yaw = 0.0
         elif target_r < curr_r: default_yaw = 180.0
         else:                   default_yaw = 0.0
-        self.target_yaw = 0.0 if (target_c, target_r) in [(2, 1), (1, 4), (3, 4)] else default_yaw
+        self.target_yaw = 0.0 if (curr_c, curr_r) in [(2, 1), (1, 4), (3, 4)] else default_yaw
 
         # Nếu vừa gắp và cần di chuyển ngang (trái/phải), lui 0.2m trước để tránh va vật
         needs_backup = (just_picked == "yes" and target_c != curr_c)
         self.phase = 0 if needs_backup else 1
 
     def update(self):
-        if self.phase == 0:
-            return self._update_backup()
+        # if self.phase == 0:
+        #     return self._update_backup()
         return self._update_turn()
 
     def _update_backup(self):
@@ -209,7 +209,7 @@ class TurnToTargetCellBehavior(py_trees.behaviour.Behaviour):
 
 
 class MoveRelativeOdomBehavior(py_trees.behaviour.Behaviour):
-    def __init__(self, name, ros_node, climb_dist=0.3, flat_dist=1.2, odom_topic='/odometry/filtered'):
+    def __init__(self, name, ros_node, climb_dist=0.25, flat_dist=1.2, odom_topic='/odometry/filtered'):
         super().__init__(name)
         self.ros_node = ros_node
         self.climb_dist = float(climb_dist)

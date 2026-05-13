@@ -22,21 +22,21 @@ HEADER2 = 0x55
 KEEP_ALIVE_TIMEOUT = 4.0
 
 PREDEFINED_POSES = {
-    "home_pose_right":    ( [0.0, 0.0, 0.0, 105.0, 90.0],    [0.0,  0.0,  1.0, 0.0, 0.0] ),
-    "approach_j4_right":  ( [0.0, 0.0, 0.0, 45.0, 90.0],    [0.0,  0.0, 0.0, 0.0, 0.0] ), 
-    "approach_j3_right":  ( [0.0, 0.0, 0.0, 40.0, 90.0],    [0.0,  0.0, -1.0, 0.0, 0.0] ), 
-    "grasp_right":        ( [0.0, 0.0, 0.0, 40.0, 30.0],    [0.0,  0.0,  0.0, 0.0, 0.0] ),
-    "move_back_J4_right": ( [0.0, 0.0, 0.0, 105.0, 30.0],  [0.0,  0.0,  0.0, 0.0, 0.0] ),
-    "move_back_J1_right": ( [180.0, 0.0, 0.0, 105.0, 30.0],    [0.0,  0.0,  0.0, 0.0, 0.0] ),
-    "release_right":      ( [180.0, 0.0, 0.0, 105.0, 90.0],    [0.0,  0.0,  0.0, 0.0, 0.0] ),
+    "home_pose_right":    ( [0.0, 0.0, 0.0, 45.0, 90.0],    [0.0,  0.0,  -1.0, 0.0, 0.0] ),
+    "approach_j4_right":  ( [0.0, 0.0, 0.0, 105.0, 90.0],    [0.0,  0.0, 0.0, 0.0, 0.0] ), 
+    "approach_j3_right":  ( [0.0, 0.0, 0.0, 105.0, 90.0],    [0.0,  0.0, 1.0, 0.0, 0.0] ), 
+    "grasp_right":        ( [0.0, 0.0, 0.0, 105.0, 0.0],    [0.0,  0.0,  0.0, 0.0, 0.0] ),
+    "move_back_J4_right": ( [0.0, 0.0, 0.0, 45.0, 0.0],  [0.0,  0.0,  0.0, 0.0, 0.0] ),
+    "move_back_J1_right": ( [180.0, 0.0, 0.0, 45.0, 0.0],    [0.0,  0.0,  0.0, 0.0, 0.0] ),
+    "release_right":      ( [180.0, 0.0, 0.0, 45.0, 90.0],    [0.0,  0.0,  0.0, 0.0, 0.0] ),
 
-    "home_pose_left":    ( [180.0, 0.0, 0.0, 100.0, 90.0],    [0.0,  0.0,  1.0, 0.0, 0.0] ),
-    "approach_j4_left":  ( [180.0, 0.0, 0.0, 45.0,  90.0],    [0.0,  0.0, 0.0, 0.0, 0.0] ), 
-    "approach_j3_left":  ( [180.0, 0.0, 0.0, 40.0,  90.0],    [0.0,  0.0, -1.0, 0.0, 0.0] ), 
-    "grasp_left":        ( [180.0, 0.0, 0.0, 40.0,  30.0],    [0.0,  0.0,  0.0, 0.0, 0.0] ),
-    "move_back_J4_left": ( [180.0, 0.0, 0.0, 100.0, 30.0],  [0.0,  0.0,  0.0, 0.0, 0.0] ),
-    "move_back_J1_left": ( [0.0, 0.0, 0.0, 100.0,   30.0],    [0.0,  0.0,  0.0, 0.0, 0.0] ),
-    "release_left":      ( [0.0, 0.0, 0.0, 100.0,   90.0],    [0.0,  0.0,  0.0, 0.0, 0.0] ),
+    "home_pose_left":    ( [180.0, 0.0, 0.0, 45.0, 90.0],    [0.0,  0.0,  -1.0, 0.0, 0.0] ),
+    "approach_j4_left":  ( [180.0, 0.0, 0.0, 105.0,  90.0],    [0.0,  0.0, 0.0, 0.0, 0.0] ), 
+    "approach_j3_left":  ( [180.0, 0.0, 0.0, 105.0,  90.0],    [0.0,  0.0, 1.0, 0.0, 0.0] ), 
+    "grasp_left":        ( [180.0, 0.0, 0.0, 105.0,  0.0],    [0.0,  0.0,  0.0, 0.0, 0.0] ),
+    "move_back_J4_left": ( [180.0, 0.0, 0.0, 45.0, 0.0],  [0.0,  0.0,  0.0, 0.0, 0.0] ),
+    "move_back_J1_left": ( [0.0, 0.0, 0.0, 45.0,   0.0],    [0.0,  0.0,  0.0, 0.0, 0.0] ),
+    "release_left":      ( [0.0, 0.0, 0.0, 45.0,   90.0],    [0.0,  0.0,  0.0, 0.0, 0.0] ),
 
     # Alias phía phải — tên dùng trong BT
     "approach_j4":  ( [0.0, 0.0, 0.0,  40.0, 30.0],   [0.0,  0.0,  0.0, 0.0, 0.0] ),
@@ -124,7 +124,7 @@ class Esp32ArmServer(Node):
                                 self.get_logger().error(f"Lỗi đọc data struct: {parse_err}")
                         state = 0
                 else:
-                    time.sleep(0.002) # 50 Hz
+                    time.sleep(0.01) # 100 Hz
             except serial.SerialException:
                 self.get_logger().error("Cáp UART bị rút đột ngột!")
                 break
@@ -206,10 +206,10 @@ class Esp32ArmServer(Node):
             #         goal_handle.abort(); return ArmSequence.Result(success=False)
 
             # BƯỚC 2: Chay max power J3, chờ cơ cấu lò xo đẩy về điểm âm
-            with self.data_lock: self.target_eff[2] = -1.0
+            # with self.data_lock: self.target_eff[2] = 1.0
             start_wait = time.time()
             while rclpy.ok():
-                if self.get_state()[2] > 0.5: 
+                if self.get_state()[2] < 0.5: 
                     break 
                 time.sleep(0.05)
                 if goal_handle.is_cancel_requested or (time.time() - start_wait) > timeout_max: 

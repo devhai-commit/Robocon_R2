@@ -90,29 +90,36 @@ def _build_main_mission(ros_node, lat, post_ramp_yaw, side, ai_target_id):
     # --- PHASE 0: GẬP TAY AN TOÀN & CHỜ LỆNH START TỪ MÀN HÌNH ---
     pre_init_seq = py_trees.composites.Sequence("Phase_0_Standby", memory=True)
     pre_init_seq.add_child(ArmSequenceBTNode("Tool_Arm_Home", ros_node, f"home_pose_{side}", duration=2.0))
-    pre_init_seq.add_child(MoveArmBehavior("Box_Arm_Home", ros_node, target_pose=[325.0, 0.0, 0.0, 0.0]))
+    pre_init_seq.add_child(MoveArmBehavior("Box_Arm_Home", ros_node, target_pose=[250.0, 0.0, 0.0, 0.0]))
     pre_init_seq.add_child(WaitForStartSignalBehavior("Wait_For_GUI_Strategy", ros_node))
     main.add_child(pre_init_seq)
 
     # # --- Phase 1: Lấy dụng cụ và tiến ra cửa lưới ---
     init_seq = py_trees.composites.Sequence("Khoi_Dong_Va_Lay_Dung_Cu", memory=True)
     init_seq.add_child(ArmSequenceBTNode("Tool_Arm_Approach", ros_node, f"approach_j4_{side}", duration=1.0))
-    init_seq.add_child(GoToRelativePoseBehavior("Tien_Lay_Dung_Cu", ros_node, dx=0.42, dy=lat * 0.89, target_yaw_deg=0.0))
+    init_seq.add_child(GoToRelativePoseBehavior("Tien_Lay_Dung_Cu", ros_node, dx=0.42, dy=lat * 1.05, target_yaw_deg=0.0))
     init_seq.add_child(build_tool_assembly_sequence(ros_node, side=side))
-    init_seq.add_child(GoToRelativePoseBehavior("Tien_Ra_Cua_Cell", ros_node, dx=1.6, dy=-lat * 2.5, target_yaw_deg=0.0))
+    init_seq.add_child(GoToRelativePoseBehavior("Tien_Ra_Cua_Cell", ros_node, dx=1.7, dy=-lat * 2.5, target_yaw_deg=0.0))
     init_seq.add_child(py_trees.behaviours.SetBlackboardVariable(
         name="Set_Target_2_1",
         variable_name="target_cell",
         variable_value=(2, 1),
         overwrite=True,
     ))
+    init_seq.add_child(WallAlignmentBehavior("Align_Cua_Cell", ros_node, window_degrees=20.0, goal_distance=0.0))
     main.add_child(init_seq)
 
 
     # --- Phase 3: Thoát khỏi sàn ---
 
     exit_seq = py_trees.composites.Sequence("Chuoi_Thoat_Khoi_San", memory=True)
-    exit_seq.add_child(GoToRelativePoseBehavior("Thoat_Tien_025",     ros_node, dx=0.25, dy=0.0, target_yaw_deg=0.0))
+    # Bắt buộc quay về hướng thẳng dốc (yaw=0) trước khi xuống bậc,
+    # tránh robot thoát nhầm sang đường của R1.
+    exit_seq.add_child(GoToRelativePoseBehavior("Quay_Huong_Thoat", ros_node, dx=0.0, dy=0.0, target_yaw_deg=0.0))
+    exit_seq.add_child(py_trees.decorators.FailureIsSuccess(
+        "Ignore_Align_Truoc_Bac",
+        WallAlignmentBehavior("Align_Truoc_Khi_Thoat", ros_node, window_degrees=20.0, goal_distance=0.0),
+    ))
     exit_seq.add_child(ClimbStepBehavior("Thoat_Xuong_Bac",           ros_node, velocity=0.1))
     exit_seq.add_child(GoToRelativePoseBehavior("Thoat_Tien_025_Sau", ros_node, dx=0.25, dy=0.0, target_yaw_deg=0.0))
     exit_seq.add_child(py_trees.decorators.FailureIsSuccess(
@@ -129,7 +136,7 @@ def _build_main_mission(ros_node, lat, post_ramp_yaw, side, ai_target_id):
             variable="robot_pos", value=(3, 4), operator=operator.eq,
         ),
     ))
-    seq_3_4.add_child(GoToRelativePoseBehavior("Di_Ve_Doc_1_3m", ros_node, dx=0.0, dy=lat * 1.3, target_yaw_deg=0.0))
+    seq_3_4.add_child(GoToRelativePoseBehavior("Di_Ve_Doc_1_3m", ros_node, dx=0.0, dy=-lat * 1.1, target_yaw_deg=0.0))
 
     seq_1_4 = py_trees.composites.Sequence("Thoat_Tu_1_4", memory=True)
     seq_1_4.add_child(py_trees.behaviours.CheckBlackboardVariableValue(
@@ -138,7 +145,7 @@ def _build_main_mission(ros_node, lat, post_ramp_yaw, side, ai_target_id):
             variable="robot_pos", value=(1, 4), operator=operator.eq,
         ),
     ))
-    seq_1_4.add_child(GoToRelativePoseBehavior("Di_Ve_Doc_3_7m", ros_node, dx=0.0, dy=lat * 3.7, target_yaw_deg=0.0))
+    seq_1_4.add_child(GoToRelativePoseBehavior("Di_Ve_Doc_3_7m", ros_node, dx=0.0, dy=-lat * 3.7, target_yaw_deg=0.0))
 
     branch_selector.add_children([seq_3_4, seq_1_4])
 
@@ -159,17 +166,27 @@ def _build_main_mission(ros_node, lat, post_ramp_yaw, side, ai_target_id):
 
     exit_goal_seq = py_trees.composites.Sequence("Mode_EXIT_Goal", memory=True)
     exit_goal_seq.add_child(py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Config_Done?",
+        check=py_trees.common.ComparisonExpression(
+            variable="target_boxes_list", value=[], operator=operator.eq,
+        ),
+    ))
+    exit_goal_seq.add_child(py_trees.behaviours.CheckBlackboardVariableValue(
         name="Real_GE_2?",
         check=py_trees.common.ComparisonExpression(
             variable="real_box_count", value=2, operator=operator.ge,
         ),
     ))
     exit_goal_seq.add_child(IsAtExitCellCondition("At_Exit_Cell?"))
-    exit_goal_seq.add_child(exit_seq)
-    exit_goal_seq.add_child(py_trees.behaviours.Success("Mission_Complete"))
     mode_selector.add_child(exit_goal_seq)
 
     find_exit_seq = py_trees.composites.Sequence("Mode_FIND_Exit", memory=True)
+    find_exit_seq.add_child(py_trees.behaviours.CheckBlackboardVariableValue(
+        name="Config_Done_Find?",
+        check=py_trees.common.ComparisonExpression(
+            variable="target_boxes_list", value=[], operator=operator.eq,
+        ),
+    ))
     find_exit_seq.add_child(py_trees.behaviours.CheckBlackboardVariableValue(
         name="Real_GE_2_Find?",
         check=py_trees.common.ComparisonExpression(
@@ -192,6 +209,7 @@ def _build_main_mission(ros_node, lat, post_ramp_yaw, side, ai_target_id):
     grid_phase = py_trees.composites.Sequence("Vao_Luoi_Va_Lap", memory=True)
     grid_phase.add_child(build_move_subtree(ros_node, ai_target_id))
     grid_phase.add_child(loop)
+    grid_phase.add_child(exit_seq)
 
     main.add_child(grid_phase)
 

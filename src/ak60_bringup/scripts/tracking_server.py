@@ -53,7 +53,7 @@ class IntegratedTrackingServer(Node):
         self.kf.measurementNoiseCov = np.eye(2, dtype=np.float32) * 5.0 
 
         # PID Control
-        self.img_center_x = 340.0
+        self.img_center_x = 350.0
         self.kp_linear_mm = 0.003
         self.kp_lateral = 0.0005
         self.max_linear_speed = 0.2

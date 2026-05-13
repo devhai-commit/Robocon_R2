@@ -19,7 +19,7 @@ class YoloTensorRTNode(Node):
         self.publisher_ = self.create_publisher(Point, '/target_coordinates', 10)
         
         # 3. Mở con mắt của robot (Camera)
-        self.cap = cv2.VideoCapture(4, cv2.CAP_V4L2) # Force dùng driver V4L2 của Linux
+        self.cap = cv2.VideoCapture(6, cv2.CAP_V4L2) # Force dùng driver V4L2 của Linux
         self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)

@@ -42,7 +42,6 @@ class StepClimbServer(Node):
             pitch_rad = math.asin(sinp)
         self.current_pitch = math.degrees(pitch_rad)
 
-    # Thay đổi: Bỏ chữ "async" trước def
     def execute_callback(self, goal_handle):
         self.get_logger().info('Nhận lệnh leo bậc. Bắt đầu di chuyển...')
         
@@ -59,6 +58,9 @@ class StepClimbServer(Node):
 
         start_time = self.get_clock().now()
         timeout_sec = CLIMB_PARAMS['timeout_sec']
+        
+        # Biến cờ để theo dõi trạng thái tăng tốc (tránh spam log)
+        is_boosted = False
 
         try:
             while rclpy.ok():
@@ -77,7 +79,21 @@ class StepClimbServer(Node):
                     result.success = False
                     return result
 
-                # 3. Điều khiển & Feedback
+                # 3. Cập nhật vận tốc linh hoạt theo độ dốc Pitch
+                # Nếu bạn muốn gán cứng vận tốc là 0.1, hãy đổi thành: move_cmd.linear.x = 0.1
+                # Ở đây tôi đang code theo hướng "tăng thêm 0.1" (target_vel + 0.1)
+                if abs(self.current_pitch) > 25.0:
+                    move_cmd.linear.x = target_vel + 0.1
+                    if not is_boosted:
+                        self.get_logger().info(f'Độ dốc > 25° (Hiện tại: {self.current_pitch:.2f}°). Tăng tốc độ leo lên {move_cmd.linear.x:.2f} m/s')
+                        is_boosted = True
+                else:
+                    move_cmd.linear.x = target_vel
+                    if is_boosted:
+                        self.get_logger().info(f'Độ dốc giảm an toàn (Hiện tại: {self.current_pitch:.2f}°). Trở về tốc độ gốc {target_vel:.2f} m/s')
+                        is_boosted = False
+
+                # 4. Điều khiển & Feedback
                 self._cmd_vel_pub.publish(move_cmd)
                 feedback_msg.current_pitch = self.current_pitch
                 goal_handle.publish_feedback(feedback_msg)
@@ -107,7 +123,6 @@ def main(args=None):
     rclpy.init(args=args)
     node = StepClimbServer()
     
-    # MultiThreadedExecutor giúp các hàm callback chạy song song
     from rclpy.executors import MultiThreadedExecutor
     executor = MultiThreadedExecutor()
     

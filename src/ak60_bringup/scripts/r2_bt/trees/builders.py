@@ -117,6 +117,7 @@ def build_move_subtree(ros_node, ai_target_id='class5'):
         ),
     ))
     real_seq.add_child(build_pick_and_place_sequence_dynamic(ros_node))
+    real_seq.add_child(MoveArmBehavior("Box_Arm_Home", ros_node, target_pose=[325.0, 0.0, 0.0, 0.0]))
     real_seq.add_child(py_trees.behaviours.SetBlackboardVariable(
         name="Set_Just_Picked",
         variable_name="just_picked",

@@ -121,12 +121,12 @@ WALL_ALIGN_PARAMS = {
 }
 
 NAV_PARAMS = {
-    'flat_dist':            1.2,    # m   — khoảng cách di chuyển vào ô phẳng
-    'climb_dist':           0.3,    # m   — khoảng cách di chuyển sau khi leo bậc
+    'flat_dist':            0.1,    # m   — khoảng cách di chuyển vào ô phẳng
+    'climb_dist':           0.1,    # m   — khoảng cách di chuyển sau khi leo bậc
     'wall_window_deg':      20.0,   # deg — góc quét LiDAR khi wall align
-    'wall_dist_vision':     0.4,    # m   — goal_distance wall align trước khi bật AI
+    'wall_dist_vision':     0.0,    # m   — goal_distance wall align trước khi bật AI (=0 chi align goc)
     'wall_dist_climb':      0.3,    # m   — goal_distance wall align trước khi leo
-    'follow_dist_mm':       315.0,  # mm  — khoảng cách dừng khi FollowTarget
+    'follow_dist_mm':       320.0,  # mm  — khoảng cách dừng khi FollowTarget
     'align_timeout_sec':    5.0,    # s   — timeout WallAlignmentBehavior trong BT
 }
 
@@ -148,16 +148,16 @@ PICK_PRESETS = {
         "home":      [   0.0,  -5.0,   0.0,  240.0],
         "pre_grasp": [   0.0,  80.0,   0.0,  240.0],
         "close":     [   0.0,  80.0,   0.0,  0.0],
-        "lift":      [ 250.0,  15.0,  90.0,  0.0],
-        "retract":   [ 250.0,   0.0,   0.0,  240.0],
+        "lift":      [ 200.0,  15.0,   90.0,  0.0],
+        "retract":   [ 200.0,  15.0,   90.0,  240.0],
     },
     'low_2': {
         "home":      [   0.0,  -5.0,   0.0,  240.0],
         "pre_grasp": [   0.0,  80.0,   0.0,  240.0],
         "close":     [   0.0,  80.0,   0.0,  0.0],
-        "lift":      [ 510.0,  15.0,  90.0,  0.0],
-        "retract":   [ 510.0,   0.0,   0.0,  240.0],
-        "hold":      [ 500.0,   0.0,   0.0,   0.0],
+        "lift":      [ 520.0,  10.0,   90.0,  0.0],
+        "retract":   [ 520.0,  10.0,   90.0,  240.0],
+        "hold":      [ 500.0,  10.0,   90.0,  240.0],
     },
     'high_1': {
         "home":      [ 300.0,  -5.0,   0.0,  240.0],
@@ -170,8 +170,8 @@ PICK_PRESETS = {
         "home":      [ 300.0,  -5.0,   0.0,  240.0],
         "pre_grasp": [ 300.0,  80.0,   0.0,  240.0],
         "close":     [ 300.0,  80.0,   0.0,  0.0],
-        "lift":      [ 510.0,  15.0,  90.0,  0.0],
-        "retract":   [ 510.0,   0.0,   0.0,  240.0],
+        "lift":      [ 520.0,  15.0,  90.0,  0.0],
+        "retract":   [ 520.0,   0.0,   0.0,  240.0],
         "hold":      [ 500.0,   0.0,   0.0,   0.0],
     },
 }
@@ -182,8 +182,7 @@ PICK_STEPS_COUNT_1 = [
     ("Pre_Grasp", "pre_grasp", 1.0),
     ("Close",     "close",     1.0),
     ("Lift",      "lift",      1.0),
-    ("Retract",   "retract",   1.0),
-    ("Home_2",    "home",      0.0),
+    ("Retract",   "retract",   2.0),
 ]
 
 # Hộp thứ hai — thêm bước hold ở arm1=500mm để tránh va hộp đã đặt trước
@@ -192,7 +191,6 @@ PICK_STEPS_COUNT_2 = [
     ("Pre_Grasp", "pre_grasp", 1.0),
     ("Close",     "close",     1.0),
     ("Lift",      "lift",      1.0),
-    ("Retract",   "retract",   1.0),
+    ("Retract",   "retract",   2.0),
     ("Hold",      "hold",      2.0),
-    ("Home_2",    "home",      0.0),
 ]

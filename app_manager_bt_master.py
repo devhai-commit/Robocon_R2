@@ -743,7 +743,7 @@ def build_move_subtree(ros_node):
     move_subtree.add_child(py_trees.decorators.FailureIsSuccess("Ignore Align Fail 2", climb_up_align_seq))
 
     move_subtree.add_child(DynamicClimbStepBehavior("Hardware: Auto Climb", ros_node))
-    move_subtree.add_child(MoveRelativeOdomBehavior("Hardware: Move Relative into Cell Center", ros_node, climb_dist=0.3, flat_dist=1.2))
+    move_subtree.add_child(MoveRelativeOdomBehavior("Hardware: Move Relative into Cell Center", ros_node, climb_dist=0.25, flat_dist=1.0))
     
     return move_subtree
 

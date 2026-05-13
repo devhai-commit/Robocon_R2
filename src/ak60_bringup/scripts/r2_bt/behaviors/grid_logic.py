@@ -100,15 +100,17 @@ class DecideNextGridCellAction(py_trees.behaviour.Behaviour):
         self.blackboard.register_key(key="grid_status", access=py_trees.common.Access.READ)
         self.blackboard.register_key(key="visit_path", access=py_trees.common.Access.READ)
         self.blackboard.register_key(key="priority_col", access=py_trees.common.Access.READ)
-        self.blackboard.register_key(key="target_boxes_list", access=py_trees.common.Access.READ)
+        self.blackboard.register_key(key="target_boxes_list", access=py_trees.common.Access.WRITE)
         self.blackboard.register_key(key="target_cell", access=py_trees.common.Access.WRITE)
 
     def _drop_completed_target(self, target_boxes, grid_status, curr_pos):
-        if not target_boxes or target_boxes[0] != curr_pos:
+        if not target_boxes:
             return target_boxes
-
-        cell_state = grid_status.get(curr_pos, {})
-        if cell_state.get('visited') or cell_state.get('scanned'):
+        front = target_boxes[0]
+        cell_state = grid_status.get(front, {})
+        if cell_state.get('state') == 'obstacle':
+            return target_boxes[1:]
+        if front == curr_pos and (cell_state.get('visited') or cell_state.get('scanned')):
             return target_boxes[1:]
         return target_boxes
 
@@ -166,15 +168,14 @@ class DecideNextGridCellAction(py_trees.behaviour.Behaviour):
             else:
                 target_cell = visit_path[-2] if len(visit_path) >= 2 else visit_path[0]
         else:
-            closest_cell, min_dist = None, float('inf')
-            for cell in accessible_neighbors:
-                dist = min(
-                    manhattan_distance(cell[0], cell[1], e[0], e[1])
-                    for e in self.EXIT_CELLS
-                )
-                if dist < min_dist:
-                    min_dist, closest_cell = dist, cell
-            target_cell = closest_cell
+            target_cell = min(
+                accessible_neighbors,
+                key=lambda cell: (
+                    min(manhattan_distance(cell[0], cell[1], e[0], e[1]) for e in self.EXIT_CELLS),
+                    -cell[1],
+                    -cell[0],
+                ),
+            )
 
         if target_cell:
             self.blackboard.target_cell = target_cell
@@ -255,10 +256,15 @@ class IsAtExitCellCondition(py_trees.behaviour.Behaviour):
 class KeepRunningUntilSuccess(py_trees.decorators.Decorator):
     def __init__(self, name, child):
         super().__init__(name=name, child=child)
+        self.blackboard = self.attach_blackboard_client(name=name)
+        self.blackboard.register_key(key="robot_pos", access=py_trees.common.Access.READ)
 
     def update(self):
         if getattr(self, 'decorated', None) is None:
             return py_trees.common.Status.FAILURE
         if self.decorated.status == py_trees.common.Status.SUCCESS:
+            return py_trees.common.Status.SUCCESS
+        if (self.blackboard.exists("robot_pos")
+                and self.blackboard.robot_pos in _EXIT_CELLS):
             return py_trees.common.Status.SUCCESS
         return py_trees.common.Status.RUNNING

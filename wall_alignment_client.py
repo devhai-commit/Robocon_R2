@@ -80,7 +80,7 @@ def main(args=None):
     # Kịch bản Test:
     # Cửa sổ quét: 15 độ (để lấy cụm tia laser phía trước)
     # Khoảng cách muốn dừng: 0.4 mét (40 cm)
-    action_client.send_goal(window_deg=15.0, target_dist=0.4)
+    action_client.send_goal(window_deg=15.0, target_dist=0.6)
     
     try:
         rclpy.spin(action_client)

@@ -95,9 +95,9 @@ def _build_main_mission(ros_node, lat, post_ramp_yaw, side, ai_target_id):
     # # --- Phase 1: Lấy dụng cụ và tiến ra cửa lưới ---
     init_seq = py_trees.composites.Sequence("Khoi_Dong_Va_Lay_Dung_Cu", memory=True)
     init_seq.add_child(ArmSequenceBTNode("Tool_Arm_Approach", ros_node, f"approach_j4_{side}", duration=1.0))
-    init_seq.add_child(GoToRelativePoseBehavior("Tien_Lay_Dung_Cu", ros_node, dx=0.22, dy=lat * 0.89, target_yaw_deg=0.0))
+    init_seq.add_child(GoToRelativePoseBehavior("Tien_Lay_Dung_Cu", ros_node, dx=0.18, dy=lat * 1.0, target_yaw_deg=0.0))
     init_seq.add_child(build_tool_assembly_sequence(ros_node, side=side))
-    init_seq.add_child(GoToRelativePoseBehavior("Tien_Ra_Cua_Cell", ros_node, dx=1.6, dy=-lat * 2.5, target_yaw_deg=0.0))
+    init_seq.add_child(GoToRelativePoseBehavior("Tien_Ra_Cua_Cell", ros_node, dx=1.9, dy=-lat * 2.5, target_yaw_deg=0.0))
     init_seq.add_child(py_trees.behaviours.SetBlackboardVariable(
         name="Set_Target_2_1",
         variable_name="target_cell",
@@ -109,15 +109,15 @@ def _build_main_mission(ros_node, lat, post_ramp_yaw, side, ai_target_id):
 # ==== Lay hop bac 1 =========================
     main.add_child(py_trees.decorators.FailureIsSuccess(
         "Ignore_Align_Exit",
-        WallAlignmentBehavior("Align_Cua_Cell", ros_node, window_degrees=20.0, goal_distance=0.5, timeout_sec=10.0),))
+        WallAlignmentBehavior("Align_Cua_Cell", ros_node, window_degrees=20.0, goal_distance=0.0, timeout_sec=10.0),))
     main.add_child(py_trees.decorators.FailureIsSuccess(
         "Run_AI",
-        FollowTargetBehavior("Run_AI_ID1", ros_node, target_id="class5", desired_distance_mm=600.0)))
+        FollowTargetBehavior("Run_AI_ID1", ros_node, target_id="class5", desired_distance_mm=335.0)))
     
-    main.add_child(GoToRelativePoseBehavior("Tien_0.3m_Before_Pick", ros_node, dx=0.3, dy=0.0, target_yaw_deg=0.0))
-
+    # main.add_child(GoToRelativePoseBehavior("Tien_0.3m_Before_Pick", ros_node, dx=0.3, dy=0.0, target_yaw_deg=0.0))
+    main.add_child(build_pick_and_place_sequence(ros_node))  
     # main.add_child(RosWaitBehavior("Roswait_2s", ros_node, duration_sec=2.0))
-    # main.add_child(IncrementRealCountAction("Add_Score_Initial"))
+    main.add_child(IncrementRealCountAction("Add_Score_Initial"))
 
 # ==== Leen bac 1 , lay hop bac 2 =================================
 
@@ -130,7 +130,7 @@ def _build_main_mission(ros_node, lat, post_ramp_yaw, side, ai_target_id):
         "Run_AI",
         FollowTargetBehavior("Run_AI2", ros_node, target_id="class5", desired_distance_mm=600.0)))
     main.add_child(GoToRelativePoseBehavior("Tien_0.3m_Before_Pick_2", ros_node, dx=0.3, dy=0.0, target_yaw_deg=0.0))
-
+    main.add_child(build_pick_and_place_sequence(ros_node)) 
 
 # ===== Leen bac 2 =============================
     main.add_child(ClimbStepBehavior("Len_Bac_2", ros_node, velocity=0.3))
@@ -150,16 +150,16 @@ def _build_main_mission(ros_node, lat, post_ramp_yaw, side, ai_target_id):
 # ===== Align bac 6 =============================
     main.add_child(py_trees.decorators.FailureIsSuccess(
         "Ignore_Align_Bac_6",
-        WallAlignmentBehavior("Align_Bac_6", ros_node, window_degrees=20.0, goal_distance=0.3, timeout_sec=5.0),))    
+        WallAlignmentBehavior("Align_Bac_6", ros_node, window_degrees=20.0, goal_distance=0.0, timeout_sec=5.0),))    
 # ===== Di chuyen ve doc 1.3m =============================           
-    main.add_child(GoToRelativePoseBehavior("Di_Ve_Doc_1_3m", ros_node, dx=0.0, dy=lat * 1.3, target_yaw_deg=0.0))  
+    main.add_child(GoToRelativePoseBehavior("Di_Ve_Doc_1_0m", ros_node, dx=0.0, dy=-lat * 1.1, target_yaw_deg=0.0))  
 # ===== Len doc =============================
-    main.add_child(ClimbStepBehavior("Len_Doc", ros_node, velocity=0.8))
+    main.add_child(ClimbStepBehavior("Len_Doc", ros_node, velocity=0.6))
 # ===== Quay ve arena =============================
-    main.add_child(GoToRelativePoseBehavior("Quay_Ve_Arena", ros_node, dx=0.0, dy=0.0, target_yaw_deg=-90.0))
+    main.add_child(GoToRelativePoseBehavior("Quay_Ve_Arena", ros_node, dx=0.0, dy=0.0, target_yaw_deg=-105.0))
 # ===== Tien 4m =============================
     main.add_child(GoToRelativePoseBehavior("Tien_4m", ros_node, dx=4.0, dy=0.0, target_yaw_deg=-90.0))
-    main.add_child(GoToRelativePoseBehavior("Tien_4m", ros_node, dx=0.0, dy=-3.0, target_yaw_deg=-90.0))
+    # main.add_child(GoToRelativePoseBehavior("Tien_4m", ros_node, dx=0.0, dy=-3.0, target_yaw_deg=-90.0))
 # ==== Align truoc khi vao arena =============================
     main.add_child(py_trees.decorators.FailureIsSuccess(
         "Ignore_Align_Before_Arena",
