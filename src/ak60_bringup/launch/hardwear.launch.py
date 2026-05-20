@@ -45,6 +45,7 @@ def generate_launch_description():
     imu_node   = Node(package='ak60_robot_driver_io', executable='imu_node', output='screen')
     can_node   = Node(package='ak60_robot_driver_io', executable='can_node', output='screen')
     steer_node = Node(package='ak60_robot_driver_io', executable='serial_node', output='screen')
+    laser_node = Node(package='ak60_robot_driver_io', executable='laser_node', output='screen')
 
     lidar_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -89,7 +90,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         # 1. Bật URDF, Cảm biến, CAN/Serial, EKF và RealSense ngay từ đầu
-        rsp_node, imu_node, can_node, steer_node, ekf_node, 
+        rsp_node, imu_node, can_node, steer_node, ekf_node, laser_node,
         realsense_launch, lidar_launch,
         # 2. Bật Controller Manager sau 1 giây
         TimerAction(period=1.0, actions=[controller_manager]),

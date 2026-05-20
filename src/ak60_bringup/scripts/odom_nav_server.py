@@ -9,13 +9,27 @@ import math
 import threading
 
 from rclpy.executors import MultiThreadedExecutor
-from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup
 
 class OdomNavSwerveServer(Node):
     def __init__(self):
         super().__init__('odom_nav_swerve_server')
         
-        self.cb_group = ReentrantCallbackGroup()
+        # --- 1. Khai báo ROS 2 Parameters (Dễ dàng tuning) ---
+        self.declare_parameter('dist_tolerance', 0.05)
+        self.declare_parameter('yaw_tolerance', 0.035) # ~2 độ
+        self.declare_parameter('kp_xy', 1.5)
+        self.declare_parameter('kp_angular', 1.0)
+        self.declare_parameter('max_vel_xy', 0.6)
+        self.declare_parameter('min_vel_xy', 0.05) # Đủ để thắng ma sát tĩnh
+        self.declare_parameter('max_vel_z', 0.6)
+        self.declare_parameter('min_vel_z', 0.1)   # Đủ để thắng ma sát tĩnh xoay
+
+        # --- 2. Tối ưu Callback Groups ---
+        # Action Server có thể nhận Cancel/Goal mới đồng thời (Reentrant)
+        self.action_cb_group = ReentrantCallbackGroup()
+        # Odom chỉ cần cập nhật tuần tự, tránh tranh chấp tài nguyên (Mutually Exclusive)
+        self.odom_cb_group = MutuallyExclusiveCallbackGroup()
 
         self._action_server = ActionServer(
             self,
@@ -23,7 +37,7 @@ class OdomNavSwerveServer(Node):
             'navigate_to_pose',
             execute_callback=self.execute_callback,
             cancel_callback=self.cancel_callback,
-            callback_group=self.cb_group
+            callback_group=self.action_cb_group
         )
 
         self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
@@ -32,10 +46,9 @@ class OdomNavSwerveServer(Node):
             '/odometry/filtered', 
             self.odom_callback, 
             10, 
-            callback_group=self.cb_group
+            callback_group=self.odom_cb_group
         )
 
-        # Khóa chống Race Condition
         self.odom_lock = threading.Lock()
         
         self.current_x = 0.0
@@ -53,7 +66,6 @@ class OdomNavSwerveServer(Node):
         return math.atan2(siny_cosp, cosy_cosp)
 
     def normalize_angle(self, angle):
-        """Tối ưu hóa phép chuẩn hóa góc bằng modulo"""
         return (angle + math.pi) % (2 * math.pi) - math.pi
 
     def odom_callback(self, msg):
@@ -64,9 +76,19 @@ class OdomNavSwerveServer(Node):
             self.odom_received = True
 
     def stop_robot(self):
-        """Hàm phụ trợ để dừng robot"""
-        cmd_msg = Twist()
-        self.cmd_vel_pub.publish(cmd_msg)
+        self.cmd_vel_pub.publish(Twist())
+
+    def apply_velocity_limits(self, velocity, max_v, min_v):
+        """Hàm giới hạn vận tốc an toàn và chống kẹt ma sát tĩnh"""
+        if velocity == 0.0: return 0.0
+        sign = 1.0 if velocity > 0 else -1.0
+        abs_vel = abs(velocity)
+        
+        if abs_vel > max_v:
+            return max_v * sign
+        elif abs_vel < min_v:
+            return min_v * sign
+        return velocity
 
     def execute_callback(self, goal_handle):
         self.get_logger().info('🎯 NHẬN LỆNH DI CHUYỂN SWERVE MỚI!')
@@ -80,19 +102,19 @@ class OdomNavSwerveServer(Node):
         target_y = goal_handle.request.pose.pose.position.y
         target_yaw_final = self.quaternion_to_yaw(goal_handle.request.pose.pose.orientation)
 
-        # Lấy trạng thái bắt đầu một cách an toàn
         with self.odom_lock:
             initial_yaw = self.current_yaw 
 
-        # --- Cấu hình tham số ---
-        dist_tolerance = 0.05
-        yaw_tolerance = 2.0 * math.pi / 180.0  # 2 độ  
-        kp_xy = 1.5
-        kp_angular = 1.0
-        max_vel_xy = 0.6
-        max_vel_z = 0.6
+        # Đọc tham số ROS 2
+        p_dist_tol = self.get_parameter('dist_tolerance').value
+        p_yaw_tol = self.get_parameter('yaw_tolerance').value
+        p_kp_xy = self.get_parameter('kp_xy').value
+        p_kp_ang = self.get_parameter('kp_angular').value
+        p_max_v_xy = self.get_parameter('max_vel_xy').value
+        p_min_v_xy = self.get_parameter('min_vel_xy').value
+        p_max_v_z = self.get_parameter('max_vel_z').value
+        p_min_v_z = self.get_parameter('min_vel_z').value
         
-        # Chạy vòng lặp ở tần số 20Hz (0.05s) chuẩn ROS 2
         rate = self.create_rate(20) 
         feedback_msg = NavigateToPose.Feedback()
         cmd_msg = Twist()
@@ -104,7 +126,6 @@ class OdomNavSwerveServer(Node):
         while rclpy.ok():
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
-                self.get_logger().info('🛑 Đã hủy lệnh Giai đoạn 1.')
                 self.stop_robot()
                 return NavigateToPose.Result()
 
@@ -115,34 +136,49 @@ class OdomNavSwerveServer(Node):
             dy = target_y - cy
             distance = math.hypot(dx, dy)
 
-            if distance < dist_tolerance:
+            if distance < p_dist_tol:
                 break
 
-            # Tính toán vector vận tốc toàn cục (Global)
-            vel_x_global = kp_xy * dx
-            vel_y_global = kp_xy * dy
-            
-            # Giữ nguyên góc hiện tại khi đang tịnh tiến (Tránh bị xoay ngang xe do sai số)
+            # Tính vector toàn cục
+            vel_x_global = p_kp_xy * dx
+            vel_y_global = p_kp_xy * dy
             heading_error = self.normalize_angle(initial_yaw - cyaw)
 
+            cos_y = math.cos(cyaw)
+            sin_y = math.sin(cyaw)
+
             # Chuyển hệ tọa độ (Global -> Local)
-            vel_x_local = vel_x_global * math.cos(-cyaw) - vel_y_global * math.sin(-cyaw)
-            vel_y_local = vel_x_global * math.sin(-cyaw) + vel_y_global * math.cos(-cyaw)
+            vel_x_local = vel_x_global * cos_y + vel_y_global * sin_y
+            vel_y_local = -vel_x_global * sin_y + vel_y_global * cos_y
             
-            # --- TỐI ƯU CỰC KỲ QUAN TRỌNG: Kẹp giới hạn (Clamp) theo vector, không kẹp từng trục
+            # Kẹp giới hạn vector tịnh tiến (Clamp & Anti-stall)
             vel_mag = math.hypot(vel_x_local, vel_y_local)
-            if vel_mag > max_vel_xy:
-                scale = max_vel_xy / vel_mag
+            if vel_mag > 0:
+                if vel_mag > p_max_v_xy:
+                    scale = p_max_v_xy / vel_mag
+                elif vel_mag < p_min_v_xy:
+                    scale = p_min_v_xy / vel_mag
+                else:
+                    scale = 1.0
+                    
                 vel_x_local *= scale
                 vel_y_local *= scale
 
             cmd_msg.linear.x = vel_x_local
             cmd_msg.linear.y = vel_y_local
-            cmd_msg.angular.z = max(-max_vel_z, min(max_vel_z, kp_angular * heading_error))
+            
+            # --- FIX LỖI KHÓA YAW TẠI ĐÂY ---
+            # Sử dụng Deadband: Chỉ bù góc nếu sai số lớn hơn dung sai cho phép
+            if abs(heading_error) < p_yaw_tol:
+                cmd_msg.angular.z = 0.0
+            else:
+                # Dùng p_min_v_z để đảm bảo lực xoay luôn thắng được ma sát tĩnh
+                cmd_msg.angular.z = self.apply_velocity_limits(p_kp_ang * heading_error, p_max_v_z, p_min_v_z)
+            
             self.cmd_vel_pub.publish(cmd_msg)
-
             feedback_msg.distance_remaining = distance
             goal_handle.publish_feedback(feedback_msg)
+            
             rate.sleep()
 
         self.stop_robot()
@@ -150,12 +186,10 @@ class OdomNavSwerveServer(Node):
         # ========================================================
         # GIAI ĐOẠN 2: XOAY TẠI CHỖ
         # ========================================================
-        
         self.get_logger().info('Giai đoạn 2: Đã tới vị trí, Đang xoay tại chỗ...')
         while rclpy.ok():
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
-                self.get_logger().info('🛑 Đã hủy lệnh Giai đoạn 2.')
                 self.stop_robot()
                 return NavigateToPose.Result()
 
@@ -163,15 +197,15 @@ class OdomNavSwerveServer(Node):
                 cyaw = self.current_yaw
 
             yaw_error = self.normalize_angle(target_yaw_final - cyaw)
-
-            self.get_logger().info(f'Goc lech hien tai: {yaw_error}')
             
-            if abs(yaw_error) < yaw_tolerance:
+            if abs(yaw_error) < p_yaw_tol:
                 break
 
             cmd_msg.linear.x = 0.0
             cmd_msg.linear.y = 0.0
-            cmd_msg.angular.z = max(-max_vel_z, min(max_vel_z, kp_angular * yaw_error))
+            # Giới hạn tốc độ xoay và đảm bảo tốc độ xoay tối thiểu
+            cmd_msg.angular.z = self.apply_velocity_limits(p_kp_ang * yaw_error, p_max_v_z, p_min_v_z)
+            
             self.cmd_vel_pub.publish(cmd_msg)
             rate.sleep()
 
@@ -194,4 +228,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-    

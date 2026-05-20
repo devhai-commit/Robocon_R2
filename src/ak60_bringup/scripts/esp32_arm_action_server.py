@@ -14,7 +14,7 @@ import sys
 from ak60_bringup.action import ArmSequence 
 
 # ================= CONFIG =================
-PORT = '/dev/esp32_arm' 
+PORT = '/dev/ttyEsp32' 
 BAUD_RATE = 115200
 NUM_JOINTS = 5
 HEADER1 = 0xAA
@@ -221,7 +221,7 @@ class Esp32ArmServer(Node):
             while rclpy.ok() and (time.time() - wait_timer) < 5.0:
                 time.sleep(0.05)
                 
-            with self.data_lock: self.target_pos[4] = 30.0 
+            with self.data_lock: self.target_pos[4] = 90.0 
             
             wait_timer = time.time()
             while rclpy.ok() and (time.time() - wait_timer) < 10.0:
@@ -324,6 +324,7 @@ class Esp32ArmServer(Node):
             return result
         
 def destroy_node(self):
+        self.get_logger().info("Đang tắt Server, đưa tay máy về Sleep...")
         # Đưa robot về an toàn và nhả cổng COM khi bấm Ctrl+C
         self.enter_sleep_mode()
         time.sleep(0.1)
@@ -340,7 +341,8 @@ def main(args=None):
     except KeyboardInterrupt: pass
     finally:
         action_server.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

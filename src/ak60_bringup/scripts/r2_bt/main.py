@@ -6,7 +6,8 @@ from rclpy.node import Node
 import py_trees
 import py_trees_ros
 # from r2_bt.trees.mission_test import create_tree
-from r2_bt.trees.mission import create_tree
+# from r2_bt.trees.mission import create_tree
+from r2_bt.trees.test_weapon import create_tree
 from r2_bt.config import FIELD_CONFIGS
 
 

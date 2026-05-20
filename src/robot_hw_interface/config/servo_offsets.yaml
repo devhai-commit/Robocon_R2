@@ -1,8 +1,8 @@
-steer_1: 10.0
-steer_2: 15.0
-steer_3: -5.0
+steer_1: 0.0
+steer_2: 10.0
+steer_3: 0.0
 steer_4: 0.0
-steer_5: 25.0
-steer_6: -15.0
+steer_5: 38.0
+steer_6: -25.0
 arm_joint_2: 0.0
 arm_joint_3: 0.0

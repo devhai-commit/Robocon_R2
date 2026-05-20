@@ -37,9 +37,17 @@ FIELD_CONFIGS = {
         'map_heights':       [400.0, 200.0, 400.0, 200.0, 200.0, 400.0, 600.0, 400.0, 400.0, 600.0, 400.0, 200.0],
         'default_elevation': 0.0,
         'lat':               1.0,
-        'post_ramp_yaw':    -90.0,
+        'post_ramp_yaw':    90.0,
         'tool_arm_side':    'right',
-        'ai_target_id':     'class4',  # YOLO label của hộp R2REAL phía red
+        'ai_target_id':     'class6',  # YOLO label của hộp R2REAL phía red
+        'r1_id':            'class2',
+        # Tọa độ (dx, dy) tuyệt đối đến từng ô cửa lưới — chỉnh riêng cho từng sân
+        'entrance_box_coords': {
+            (1, 1): (1.1, -2.2),
+            (2, 1): (1.4, -2.4),
+            (3, 1): (1.2, -1.8),
+        },
+        'entrance_default_target': (2, 1),
     },
     'blue': {
         'map_cols':          [1,     1,     1,  1,   2,     2,     2  , 2,     3,     3,     3, 3    ],
@@ -47,9 +55,17 @@ FIELD_CONFIGS = {
         'map_heights':       [400.0, 600.0, 400.0, 200.0, 200.0, 400.0, 600.0, 400.0, 400.0, 200.0, 400.0, 200.0],
         'default_elevation': 0.0,
         'lat':              -1.0,
-        'post_ramp_yaw':    90.0,
+        'post_ramp_yaw':    -90.0,
         'tool_arm_side':    'left',
         'ai_target_id':     'class5',  # YOLO label của hộp R2REAL phía blue
+        'r1_id':            'class1',
+        # Sân blue bị mirror ngang → dy đổi dấu so với red; dx giữ nguyên
+        'entrance_box_coords': {
+            (1, 1): (1.1,  1.8),
+            (2, 1): (1.4,  2.4),
+            (3, 1): (1.2,  2.2),
+        },
+        'entrance_default_target': (2, 1),
     },
 }
 
@@ -121,12 +137,12 @@ WALL_ALIGN_PARAMS = {
 }
 
 NAV_PARAMS = {
-    'flat_dist':            0.1,    # m   — khoảng cách di chuyển vào ô phẳng
-    'climb_dist':           0.1,    # m   — khoảng cách di chuyển sau khi leo bậc
+    'flat_dist':            0.3,    # m   — khoảng cách di chuyển vào ô phẳng
+    'climb_dist':           0.3,    # m   — khoảng cách di chuyển sau khi leo bậc
     'wall_window_deg':      20.0,   # deg — góc quét LiDAR khi wall align
     'wall_dist_vision':     0.0,    # m   — goal_distance wall align trước khi bật AI (=0 chi align goc)
     'wall_dist_climb':      0.3,    # m   — goal_distance wall align trước khi leo
-    'follow_dist_mm':       320.0,  # mm  — khoảng cách dừng khi FollowTarget
+    'follow_dist_mm':       325.0,  # mm  — khoảng cách dừng khi FollowTarget
     'align_timeout_sec':    5.0,    # s   — timeout WallAlignmentBehavior trong BT
 }
 
@@ -150,6 +166,7 @@ PICK_PRESETS = {
         "close":     [   0.0,  80.0,   0.0,  0.0],
         "lift":      [ 200.0,  15.0,   90.0,  0.0],
         "retract":   [ 200.0,  15.0,   90.0,  240.0],
+        "home_2":    [325.0, 0.0, 0.0, 0.0]
     },
     'low_2': {
         "home":      [   0.0,  -5.0,   0.0,  240.0],
@@ -157,7 +174,7 @@ PICK_PRESETS = {
         "close":     [   0.0,  80.0,   0.0,  0.0],
         "lift":      [ 520.0,  10.0,   90.0,  0.0],
         "retract":   [ 520.0,  10.0,   90.0,  240.0],
-        "hold":      [ 500.0,  10.0,   90.0,  240.0],
+        "home_2":     [ 400.0,  -10.0,   90.0,  0.0],
     },
     'high_1': {
         "home":      [ 300.0,  -5.0,   0.0,  240.0],
@@ -165,32 +182,42 @@ PICK_PRESETS = {
         "close":     [ 300.0,  80.0,   0.0,  0.0],
         "lift":      [ 250.0,  15.0,  90.0,  0.0],
         "retract":   [ 250.0,   0.0,   0.0,  240.0],
+        "home_2":    [325.0, 0.0, 0.0, 0.0]
     },
     'high_2': {
         "home":      [ 300.0,  -5.0,   0.0,  240.0],
         "pre_grasp": [ 300.0,  80.0,   0.0,  240.0],
         "close":     [ 300.0,  80.0,   0.0,  0.0],
         "lift":      [ 520.0,  15.0,  90.0,  0.0],
-        "retract":   [ 520.0,   0.0,   0.0,  240.0],
-        "hold":      [ 500.0,   0.0,   0.0,   0.0],
+        "retract":   [ 520.0,   0.0,   90.0,  240.0],
+        "home_2":    [ 400.0,  -10.0,   90.0,   0.0],
     },
+    '400': {
+        "home":      [ 500.0,  -5.0,   0.0,  240.0],
+        "pre_grasp": [ 500.0,  80.0,   0.0,  240.0],
+        "close":     [ 500.0,  80.0,   0.0,  0.0],
+        "lift":      [ 430.0,  15.0,  90.0,  0.0],
+        "retract":   [ 430.0,   0.0,   90.0,  240.0],
+        "home_2":    [ 400.0,  0.0,   0.0,   0.0],
+    }
 }
 
 # (step_name, preset_key, wait_sec) — hộp thứ nhất, không có bước hold
 PICK_STEPS_COUNT_1 = [
-    ("Home_1",    "home",      1.0),
-    ("Pre_Grasp", "pre_grasp", 1.0),
-    ("Close",     "close",     1.0),
-    ("Lift",      "lift",      1.0),
-    ("Retract",   "retract",   2.0),
+    ("Home_1",    "home",      0.5),
+    ("Pre_Grasp", "pre_grasp", 0.5),
+    ("Close",     "close",     0.5),
+    ("Lift",      "lift",      0.5),
+    ("Retract",   "retract",   0.5),
+    ("Home_2",    "home_2",    0.5),
 ]
 
 # Hộp thứ hai — thêm bước hold ở arm1=500mm để tránh va hộp đã đặt trước
 PICK_STEPS_COUNT_2 = [
-    ("Home_1",    "home",      1.0),
-    ("Pre_Grasp", "pre_grasp", 1.0),
-    ("Close",     "close",     1.0),
-    ("Lift",      "lift",      1.0),
-    ("Retract",   "retract",   2.0),
-    ("Hold",      "hold",      2.0),
+    ("Home_1",    "home",      0.5),
+    ("Pre_Grasp", "pre_grasp", 0.5),
+    ("Close",     "close",     0.5),
+    ("Lift",      "lift",      0.5),
+    ("Retract",   "retract",   0.5),
+    ("Home_2",    "home_2",    0.5),
 ]

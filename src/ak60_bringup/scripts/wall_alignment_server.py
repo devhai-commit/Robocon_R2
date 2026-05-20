@@ -24,6 +24,37 @@ if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 from r2_bt.config import WALL_ALIGN_PARAMS
 
+# ==========================================
+# LỚP BỘ LỌC KALMAN 1 CHIỀU (1D KALMAN FILTER)
+# ==========================================
+class SimpleKalmanFilter:
+    def __init__(self, process_noise=1e-3, measurement_noise=1e-2):
+        self.q = process_noise      # Q: Nhiễu hệ thống (Robot di chuyển thực tế)
+        self.r = measurement_noise  # R: Nhiễu cảm biến (Lidar noise)
+        self.p = 1.0                # P: Sai số ước lượng ban đầu
+        self.x = None               # Trạng thái hiện tại (Giá trị đã lọc)
+
+    def update(self, measurement):
+        # Khởi tạo giá trị đầu tiên
+        if self.x is None:
+            self.x = measurement
+            return self.x
+
+        # 1. Bước Dự đoán (Predict)
+        p_pred = self.p + self.q
+
+        # 2. Bước Cập nhật (Update)
+        k = p_pred / (p_pred + self.r) # Hệ số Kalman Gain
+        self.x = self.x + k * (measurement - self.x)
+        self.p = (1 - k) * p_pred
+
+        return self.x
+
+    def reset(self):
+        self.x = None
+        self.p = 1.0
+
+
 class WallAlignmentServer(Node):
     def __init__(self):
         super().__init__('wall_alignment_server')
@@ -61,7 +92,12 @@ class WallAlignmentServer(Node):
         self.tolerance_m          = WALL_ALIGN_PARAMS['tolerance_m']
         self.lidar_yaw_offset_deg = WALL_ALIGN_PARAMS['lidar_yaw_offset_deg']
 
-        self.get_logger().info('Action Server [Align -> Snap Yaw -> Approach] Đã sẵn sàng!')
+        # KHỞI TẠO BỘ LỌC KALMAN CHO KHOẢNG CÁCH VÀ GÓC
+        # Q nhỏ (tin tưởng mô hình đứng yên/tiến đều), R lớn (bọc nhiễu Lidar)
+        self.kf_dist = SimpleKalmanFilter(process_noise=0.001, measurement_noise=0.05)
+        self.kf_angle = SimpleKalmanFilter(process_noise=0.01, measurement_noise=0.1)
+
+        self.get_logger().info('Action Server [Align -> Snap Yaw -> Active Approach + Kalman Filter] Đã sẵn sàng!')
 
     def scan_callback(self, msg):
         self.latest_scan = msg
@@ -127,7 +163,6 @@ class WallAlignmentServer(Node):
         msg.pose.covariance[35] = 1e-9  
 
         self.set_pose_pub.publish(msg)
-        self.get_logger().info(f'Đã Snap Yaw từ {math.degrees(self.current_yaw):.1f}° về {math.degrees(target_yaw_rad):.1f}°')
 
     def execute_callback(self, goal_handle):
         window_rad = math.radians(goal_handle.request.window_degrees)
@@ -135,10 +170,12 @@ class WallAlignmentServer(Node):
         feedback_msg = WallAlignment.Feedback()
         cmd = Twist()
         
-        # [TỐI ƯU 1]: Sử dụng đối tượng Rate của ROS 2 thay vì time.sleep để không block luồng
-        loop_rate = self.create_rate(20) # Chạy ở tần số 20Hz (0.05s)
+        loop_rate = self.create_rate(20) # 20Hz
 
-        # [TỐI ƯU 2]: Thêm rclpy.ok() vào vòng lặp chờ Lidar để tránh bị kẹt cứng nếu Lidar rớt
+        # Reset các bộ lọc Kalman khi bắt đầu lệnh mới
+        self.kf_dist.reset()
+        self.kf_angle.reset()
+
         while self.latest_scan is None and rclpy.ok():
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
@@ -158,19 +195,24 @@ class WallAlignmentServer(Node):
                     goal_handle.canceled()
                     return WallAlignment.Result()
 
-                dev_deg, current_dist = self.get_wall_state(self.latest_scan, window_rad)
-                if dev_deg is None: 
+                raw_dev_deg, raw_dist = self.get_wall_state(self.latest_scan, window_rad)
+                if raw_dev_deg is None: 
                     self.get_logger().warn('Cảnh báo: Không tìm thấy đủ 5 điểm Laser trước mặt!', throttle_duration_sec=1.0)
                     loop_rate.sleep()
                     continue
 
+                # ---> ĐƯA VÀO BỘ LỌC KALMAN <---
+                dev_deg = self.kf_angle.update(raw_dev_deg)
+                current_dist = self.kf_dist.update(raw_dist)
+
                 feedback_msg.current_phase = "ALIGNING"
                 feedback_msg.current_deviation = dev_deg
+                feedback_msg.current_distance = current_dist
                 goal_handle.publish_feedback(feedback_msg)
 
                 if abs(dev_deg) < self.tolerance_deg:
                     self.stop_robot()
-                    time.sleep(0.5) # Chờ dao động cơ khí triệt tiêu
+                    time.sleep(0.5) 
                     break
 
                 cmd.angular.z = -self.kp_angular * math.radians(dev_deg)
@@ -178,7 +220,7 @@ class WallAlignmentServer(Node):
                 cmd.angular.z = max(min(cmd.angular.z, clamp), -clamp)
                 self.cmd_pub.publish(cmd)
                 
-                loop_rate.sleep() # Thay thế time.sleep(0.05)
+                loop_rate.sleep()
 
             # ==========================================
             # PHASE 2: CHỐT GÓC YAW (SNAPPING YAW)
@@ -187,39 +229,46 @@ class WallAlignmentServer(Node):
             goal_handle.publish_feedback(feedback_msg)
             
             self.snap_yaw_to_nearest_orthogonal()
-            time.sleep(0.5) # Đợi 0.5s để EKF cập nhật
+            time.sleep(0.5) 
 
             # ==========================================
-            # PHASE 3: TIẾN ÁP SÁT TƯỜNG (BỎ QUA NẾU = 0)
+            # PHASE 3: TIẾN ÁP SÁT TƯỜNG
             # ==========================================
             if goal_dist > 0.001:  
-                self.get_logger().info(f'PHASE 3: Đang tiến vào khoảng cách mục tiêu {goal_dist}m...')
+                self.get_logger().info(f'PHASE 3: Đang tiến vào khoảng cách {goal_dist}m (Bật Active Yaw Lock)...')
                 while rclpy.ok():
                     if goal_handle.is_cancel_requested:
                         goal_handle.canceled()
                         return WallAlignment.Result()
 
-                    dev_deg, current_dist = self.get_wall_state(self.latest_scan, window_rad)
-                    if current_dist is None: 
+                    raw_dev_deg, raw_dist = self.get_wall_state(self.latest_scan, window_rad)
+                    if raw_dist is None: 
                         loop_rate.sleep()
                         continue
+
+                    # ---> ĐƯA VÀO BỘ LỌC KALMAN <---
+                    dev_deg = self.kf_angle.update(raw_dev_deg)
+                    current_dist = self.kf_dist.update(raw_dist)
 
                     error_dist = current_dist - goal_dist
 
                     feedback_msg.current_phase = "APPROACHING"
                     feedback_msg.current_distance = current_dist
+                    feedback_msg.current_deviation = dev_deg
                     goal_handle.publish_feedback(feedback_msg)
 
                     if abs(error_dist) < self.tolerance_m:
                         self.stop_robot()
                         break
 
-                    cmd.angular.z = 0.0 
                     cmd.linear.x = self.kp_linear * error_dist
                     cmd.linear.x = max(min(cmd.linear.x, 0.2), -0.2)
-                    self.cmd_pub.publish(cmd)
                     
-                    loop_rate.sleep() # Thay thế time.sleep(0.05)
+                    cmd.angular.z = -self.kp_angular * math.radians(dev_deg)
+                    cmd.angular.z = max(min(cmd.angular.z, 0.1), -0.1) 
+
+                    self.cmd_pub.publish(cmd)
+                    loop_rate.sleep()
             else:
                 self.get_logger().info('PHASE 3: Bỏ qua bước tiến (Goal distance = 0).')
 
@@ -227,20 +276,22 @@ class WallAlignmentServer(Node):
             goal_handle.succeed()
             result = WallAlignment.Result()
             result.success = True
-            result.final_deviation, result.final_distance = self.get_wall_state(self.latest_scan, window_rad)
+            
+            # Trả về giá trị đã lọc Kalman lần cuối cùng
+            result.final_deviation = self.kf_angle.x if self.kf_angle.x is not None else 0.0
+            result.final_distance = self.kf_dist.x if self.kf_dist.x is not None else 0.0
             
             self.get_logger().info(f'HOÀN THÀNH TOÀN BỘ! Cách tường: {result.final_distance:.3f}m | Lệch: {result.final_deviation:.2f}°')
             return result
 
         except Exception as e:
-            self.get_logger().error(f'Lỗi đột xuất trong quá trình chạy: {e}')
+            self.get_logger().error(f'Lỗi đột xuất: {e}')
             goal_handle.abort()
             result = WallAlignment.Result()
             result.success = False
             return result
             
         finally:
-            # [TỐI ƯU 3]: Bùa hộ mệnh tuyệt đối - Bất kể vòng lặp kết thúc do Cancel, Crash hay Hoàn thành, xe PHẢI PHANH LẠI.
             self.stop_robot()
 
     def stop_robot(self):
@@ -255,7 +306,6 @@ def main(args=None):
         executor.spin()
     except KeyboardInterrupt:
         if rclpy.ok():
-            node.get_logger().info("Đang tắt Node, phanh xe an toàn...")
             node.stop_robot()
     finally:
         node.destroy_node()
@@ -263,3 +313,4 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+    

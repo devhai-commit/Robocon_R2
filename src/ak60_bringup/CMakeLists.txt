@@ -19,11 +19,13 @@ install(PROGRAMS
   scripts/odom_nav_server.py
   scripts/step_climb_server.py
   scripts/tracking_server.py
+  scripts/k230_align_server.py
   scripts/arm_action_server.py
+  scripts/edge_detection_server.py
   scripts/esp32_arm_action_server.py
   scripts/wall_alignment_server.py
   scripts/app_manager_bt.py
-  
+
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -33,6 +35,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/ClimbStep.action"
   "action/WallAlignment.action"
   "action/ArmSequence.action"
+  "action/K230Align.action"
+  "action/MoveToEdge.action"
 
   DEPENDENCIES action_msgs
 )

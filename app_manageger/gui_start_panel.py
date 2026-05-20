@@ -10,11 +10,11 @@ class GuiStartNode(Node):
         super().__init__('gui_start_panel_node')
         self.pub = self.create_publisher(String, '/gui_start_signal', 10)
 
-    def send_config(self, priority_col, target_boxes):
+    def send_config(self, entrance_boxes, target_boxes):
         data = {
             "command": "START",
-            "priority_col": int(priority_col),
-            "target_boxes": target_boxes # Format: [[1,3], [2,4]]
+            "entrance_boxes": entrance_boxes,  # [[col, 1], ...] — ô hàng đầu robot vào trước
+            "target_boxes": target_boxes,      # Format: [[col, row], ...]
         }
         msg = String()
         msg.data = json.dumps(data)
@@ -31,9 +31,29 @@ def main(args=None):
     root.geometry("1024x600")
     root.configure(bg='#1e1e1e')
 
-    selected_col = tk.IntVar(value=2)
     target_boxes_list = []
-    grid_buttons = {} # Lưu trữ các nút trên sa bàn để đổi màu
+    entrance_boxes = []    # ô hàng đầu được chọn: [[col, 1], ...]
+    entrance_buttons = {}  # {col: tk.Button}
+    grid_buttons = {}      # Lưu trữ các nút trên sa bàn để đổi màu
+
+    # --- HÀM XỬ LÝ CHỌN Ô HÀNG ĐẦU ---
+    def toggle_entrance(c):
+        btn = entrance_buttons[c]
+        cell = [c, 1]
+        if cell in entrance_boxes:
+            entrance_boxes.remove(cell)
+            btn.config(bg="#333333", fg="white", relief=tk.RAISED)
+        else:
+            entrance_boxes.append(cell)
+            btn.config(bg="#ff8800", fg="black", relief=tk.SUNKEN)
+        update_entrance_label()
+
+    def update_entrance_label():
+        if not entrance_boxes:
+            lbl_entrance.config(text="Chưa chọn ô vào nào", fg="#aaaaaa")
+        else:
+            txt = " | ".join([f"C{x[0]}-H1" for x in sorted(entrance_boxes, key=lambda x: x[0])])
+            lbl_entrance.config(text=f"Ô hàng đầu vào: {txt}", fg="#ff8800")
 
     # --- HÀM XỬ LÝ CLICK Ô SA BÀN ---
     def toggle_cell(c, r):
@@ -54,13 +74,17 @@ def main(args=None):
             lbl_targets.config(text=f"Mục tiêu chờ gắp: {txt}", fg="#ffcc00")
 
     def clear_all():
+        entrance_boxes.clear()
+        for btn in entrance_buttons.values():
+            btn.config(bg="#333333", fg="white", relief=tk.RAISED)
+        update_entrance_label()
         target_boxes_list.clear()
         for (c, r), btn in grid_buttons.items():
             btn.config(bg="#333333", fg="white", relief=tk.RAISED)
         update_target_label()
 
     def on_start():
-        ros_node.send_config(selected_col.get(), target_boxes_list)
+        ros_node.send_config(entrance_boxes, target_boxes_list)
         btn_start.config(text="🚀 ROBOT ĐANG THI ĐẤU...", bg='#555555', fg="white", state=tk.DISABLED)
 
     # ================= LAYOUT GIAO DIỆN =================
@@ -70,16 +94,22 @@ def main(args=None):
     right_frame = tk.Frame(root, bg='#2b2b2b', bd=2, relief=tk.GROOVE)
     right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, padx=20, pady=20)
 
-    # --- TRÁI: ĐIỀU KHIỂN & CHỌN CỘT ---
-    tk.Label(left_frame, text="1. CHỌN CỘT ƯU TIÊN DI CHUYỂN", fg="#00ffcc", bg="#1e1e1e", font=("Arial", 16, "bold")).pack(pady=10)
-    col_frame = tk.Frame(left_frame, bg='#1e1e1e')
-    col_frame.pack(pady=5)
-    for i in range(1, 4):
-        tk.Radiobutton(col_frame, text=f"CỘT {i}", variable=selected_col, value=i, 
-                       font=("Arial", 18, "bold"), indicatoron=0, width=10, 
-                       bg="#444", fg="white", selectcolor="#0066ff").pack(side=tk.LEFT, padx=10)
+    # --- TRÁI: CHỌN CỘT LẤY BOX HÀNG ĐẦU ---
+    tk.Label(left_frame, text="1. CHỌN CỘT LẤY BOX HÀNG ĐẦU", fg="#00ffcc", bg="#1e1e1e", font=("Arial", 16, "bold")).pack(pady=10)
+    entrance_frame = tk.Frame(left_frame, bg='#1e1e1e')
+    entrance_frame.pack(pady=5)
+    for c in range(3, 0, -1):
+        btn = tk.Button(entrance_frame, text=f"CỘT {c}", font=("Arial", 18, "bold"),
+                        width=10,
+                        bg="#333333", fg="white", relief=tk.RAISED,
+                        command=lambda col=c: toggle_entrance(col))
+        btn.pack(side=tk.LEFT, padx=10)
+        entrance_buttons[c] = btn
 
-    tk.Label(left_frame, text="2. TRẠNG THÁI MỤC TIÊU", fg="#ffcc00", bg="#1e1e1e", font=("Arial", 16, "bold")).pack(pady=(30, 10))
+    lbl_entrance = tk.Label(left_frame, text="Chưa chọn ô vào nào", fg="#aaaaaa", bg="#1e1e1e", font=("Arial", 13, "italic"))
+    lbl_entrance.pack(pady=(5, 0))
+
+    tk.Label(left_frame, text="2. TRẠNG THÁI MỤC TIÊU", fg="#ffcc00", bg="#1e1e1e", font=("Arial", 16, "bold")).pack(pady=(20, 10))
     lbl_targets = tk.Label(left_frame, text="Chưa chọn ô mục tiêu nào", fg="#aaaaaa", bg="#1e1e1e", font=("Arial", 16, "italic"))
     lbl_targets.pack(pady=10)
 

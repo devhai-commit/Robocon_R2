@@ -1,0 +1,9 @@
+# Goal (không cần tham số — server tự đọc K230 UART)
+---
+# Result
+bool success
+string message   # "centered" / "lost" / "canceled" / "k230_not_alive" / "odom_timeout"
+---
+# Feedback
+float32 offset_x
+bool centered

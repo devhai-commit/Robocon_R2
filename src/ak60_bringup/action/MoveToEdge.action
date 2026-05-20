@@ -1,0 +1,11 @@
+# Goal: Vận tốc tiến và ngưỡng phát hiện thay đổi (mét)
+float32 speed
+float32 change_threshold
+---
+# Result: Trạng thái hoàn thành và khoảng cách cuối cùng
+bool success
+float32 final_distance
+---
+# Feedback: Khoảng cách hiện tại đang cập nhật
+float32 current_distance
+

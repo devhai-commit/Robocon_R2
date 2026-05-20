@@ -164,6 +164,7 @@ def _build_main_mission(ros_node, lat, post_ramp_yaw, side, ai_target_id):
     main.add_child(py_trees.decorators.FailureIsSuccess(
         "Ignore_Align_Before_Arena",
         WallAlignmentBehavior("Align_Before_AI", ros_node, window_degrees=20.0, goal_distance=1.4, timeout_sec=5.0),))
+
 # ===== TRacking AI =============================
     main.add_child(py_trees.decorators.FailureIsSuccess(
         "Run_AI_Exit",

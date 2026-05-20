@@ -34,6 +34,7 @@ setup(
         'can_node = ak60_robot_driver_io.can_bridge:main',
         'serial_node = ak60_robot_driver_io.steer_node:main',
         'imu_node = ak60_robot_driver_io.read_imu_node:main',
+        'laser_node = ak60_robot_driver_io.laser_distance:main',
         ],
     },
 )

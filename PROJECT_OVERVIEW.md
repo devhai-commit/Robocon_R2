@@ -40,6 +40,7 @@ ros_ws/
 │   │       ├── r2_bt/                ← Toàn bộ BT logic (xem mục 5)
 │   │       ├── arm_action_server.py
 │   │       ├── esp32_arm_action_server.py
+│   │       ├── jetson_read_uart.py       ← Đọc JSON từ K230 qua UART /dev/ttyUSB2
 │   │       ├── odom_nav_server.py
 │   │       ├── step_climb_server.py
 │   │       ├── tracking_server.py
@@ -68,6 +69,8 @@ ros_ws/
 │
 ├── app_manageger/                    ← Prototype BT cũ (standalone, không ROS)
 │   ├── app_manager_main.py
+│   ├── gui_start_panel.py            ← GUI chọn chiến thuật đầy đủ (3×4 grid + priority col)
+│   ├── gui_entrance_panel.py         ← GUI đơn giản chỉ chọn ô hàng đầu vào sân
 │   ├── bt_nodes.py
 │   └── bt_sequences.py
 │
@@ -510,6 +513,54 @@ pitch = asin(sinp)   [giới hạn ±90°]
 ### 13.7 `app_manager_bt.py` — Entry Point Behavior Tree
 
 File wrapper thuần túy (11 dòng), thêm thư mục scripts vào sys.path rồi gọi `r2_bt.main.main()`. Đây là executable được ROS 2 launch gọi.
+
+---
+
+### 13.9 `jetson_read_uart.py` — Đọc Dữ Liệu K230 Qua UART
+
+**Vị trí:** `src/ak60_bringup/scripts/jetson_read_uart.py` (163 dòng)
+
+**Mục đích:** Module standalone đọc luồng JSON từ chip nhận diện K230 gửi qua UART. K230 chạy model `kmodel` phát hiện đối tượng và liên tục gửi trạng thái về Jetson qua `/dev/ttyUSB2`.
+
+**Kết nối:** Serial `/dev/ttyUSB2` @ 115200 baud, dữ liệu mỗi dòng là 1 JSON object kết thúc bằng `\n`.
+
+**Định dạng message K230:**
+
+| Trường `status` | Ý nghĩa | Các trường kèm theo |
+|-----------------|---------|---------------------|
+| `"detect"` | Phát hiện đối tượng | `target`, `cx`, `cy`, `offset_x`, `direction`, `centered`, `area`, `score`, `n_obj` |
+| `"empty"` | Không có đối tượng trong khung | — |
+| `"alive"` | Heartbeat (không phát hiện gì) | `uptime_frame` |
+| `"system"` | Trạng thái hệ thống K230 | `"booting"/"warming_up"/"ready"/"stopped_manually"` |
+| `"error"` | Lỗi từ K230 | chuỗi mô tả lỗi |
+
+**Biến `latest` (global state):**
+
+```python
+latest = {
+    "ready": False,       # K230 đã khởi động xong
+    "target": None,       # tên class phát hiện được
+    "cx", "cy": None,     # tọa độ tâm object (pixel)
+    "offset_x": None,     # lệch so với trung tâm khung (+: phải, -: trái)
+    "direction": None,    # "GIUA" / "TRAI" / "PHAI" / "NONE"
+    "centered": False,    # True nếu |offset_x| <= tolerance
+    "area": None,         # diện tích bounding box
+    "score": None,        # confidence YOLO
+    "n_obj": 0,           # số object phát hiện trong frame
+    "alive": False,       # False nếu watchdog timeout (> 5s không có message)
+}
+```
+
+**Watchdog:** Nếu không nhận message trong 5 giây → `latest["alive"] = False` để tầng trên biết K230 bị ngắt kết nối.
+
+**Cách dùng trong vòng điều khiển robot:**
+```python
+if latest["ready"] and latest["alive"]:
+    if latest["centered"]:    stop()          # đối tượng ở giữa → dừng/gắp
+    elif latest["direction"] == "TRAI":  turn_left(...)
+    elif latest["direction"] == "PHAI":  turn_right(...)
+    else:                     scan()          # không thấy → quét
+```
 
 ---
 

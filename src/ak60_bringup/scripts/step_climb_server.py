@@ -82,10 +82,11 @@ class StepClimbServer(Node):
                 # 3. Cập nhật vận tốc linh hoạt theo độ dốc Pitch
                 # Nếu bạn muốn gán cứng vận tốc là 0.1, hãy đổi thành: move_cmd.linear.x = 0.1
                 # Ở đây tôi đang code theo hướng "tăng thêm 0.1" (target_vel + 0.1)
-                if abs(self.current_pitch) > 25.0:
-                    move_cmd.linear.x = target_vel + 0.1
+
+                if self.current_pitch > 20.0:
+                    move_cmd.linear.x = target_vel + 0.15
                     if not is_boosted:
-                        self.get_logger().info(f'Độ dốc > 25° (Hiện tại: {self.current_pitch:.2f}°). Tăng tốc độ leo lên {move_cmd.linear.x:.2f} m/s')
+                        self.get_logger().info(f'Độ dốc > 20° (Hiện tại: {self.current_pitch:.2f}°). Tăng tốc độ leo lên {move_cmd.linear.x:.2f} m/s')
                         is_boosted = True
                 else:
                     move_cmd.linear.x = target_vel

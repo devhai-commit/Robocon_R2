@@ -24,7 +24,7 @@ def build_tool_assembly_sequence(ros_node, side='left'):
         ArmSequenceBTNode("Grasp_Tool",      ros_node, f"grasp_{side}",         duration=1.0),
         ArmSequenceBTNode("Move_Back_J4",    ros_node, f"move_back_J4_{side}",  duration=1.0),
         ArmSequenceBTNode("Move_Back_J1",    ros_node, f"move_back_J1_{side}",  duration=1.0),
-        ArmSequenceBTNode("Assemble_Action", ros_node, "assemble_sequence",     duration=20.0),
+        # ArmSequenceBTNode("Assemble_Action", ros_node, "assemble_sequence",     duration=20.0),
     ])
     return seq
 
@@ -37,7 +37,6 @@ def _build_arm_seq(ros_node, preset_key, steps):
         if wait_sec > 0.0:
             seq.add_child(RosWaitBehavior(f"Wait_{step_name}", ros_node, delay_sec=wait_sec))
     return seq
-
 
 def build_pick_and_place_sequence(ros_node, mode='high'):
     """Chuỗi đặt hộp KFS lên giá Tic-Tac-Toe.
@@ -60,7 +59,7 @@ def build_pick_and_place_sequence(ros_node, mode='high'):
     return outer
 
 
-def build_pick_and_place_sequence_dynamic(ros_node):
+def build_pick_and_place_sequence_dynamic(ros_node, ai_target_id="class5"):
     """Chọn mode high/low tự động lúc runtime dựa trên chiều cao.
     h(target_cell) > h(robot_pos) → mode='high', ngược lại → mode='low'.
     """
@@ -68,12 +67,23 @@ def build_pick_and_place_sequence_dynamic(ros_node):
 
     high_branch = py_trees.composites.Sequence("Pick_If_High", memory=True)
     high_branch.add_child(IsClimbingUpCondition("Is_Target_Higher", ros_node))
+    high_branch.add_child(FollowTargetBehavior(
+        "Follow_To_Check_Height", ros_node,
+        target_id=ai_target_id,
+        desired_distance_mm=NAV_PARAMS['follow_dist_mm'],
+    ))
     high_branch.add_child(build_pick_and_place_sequence(ros_node, mode='high'))
+    
+
+    low_branch = py_trees.composites.Sequence("Pick_If_Low", memory=True)
+    low_branch.add_child(WallAlignmentBehavior("Align_Truoc_Gap_Thap",ros_node, window_degrees=20.0, goal_distance=0.65))
+    low_branch.add_child(build_pick_and_place_sequence(ros_node, mode='low'))
 
     selector.add_children([
         high_branch,
-        build_pick_and_place_sequence(ros_node, mode='low'),
+        low_branch
     ])
+
     return selector
 
 
@@ -83,25 +93,25 @@ def build_move_subtree(ros_node, ai_target_id='class5'):
 
     subtree.add_child(TurnToTargetCellBehavior("Turn_To_Face_Cell", ros_node))
 
-    # subtree.add_child(py_trees.decorators.FailureIsSuccess(
-    #     "Ignore_Align_1",
-    #     py_trees.decorators.Timeout(
-    #         "Align_1_Timeout",
-    #         WallAlignmentBehavior(
-    #             "Align_Before_Vision", ros_node,
-    #             window_degrees=NAV_PARAMS['wall_window_deg'],
-    #             goal_distance=NAV_PARAMS['wall_dist_vision'],
-    #         ),
-    #         duration=NAV_PARAMS['align_timeout_sec'],
-    #     ),
-    # ))
+    subtree.add_child(py_trees.decorators.FailureIsSuccess(
+        "Ignore_Align_1",
+        py_trees.decorators.Timeout(
+            "Align_1_Timeout",
+            WallAlignmentBehavior(
+                "Align_Before_Vision", ros_node,
+                window_degrees=20.0,
+                goal_distance=0.0,
+            ),
+            duration=5.0,
+        ),
+    ))
 
     subtree.add_child(py_trees.decorators.FailureIsSuccess(
-        "Run_AI",
+        "Run_AI_check_box_and_mark",
         FollowTargetBehavior(
             "Run_AI_ID1", ros_node,
             target_id=ai_target_id,
-            desired_distance_mm=NAV_PARAMS['follow_dist_mm'],
+            desired_distance_mm=0.0,
         ),
     ))
 
@@ -116,8 +126,8 @@ def build_move_subtree(ros_node, ai_target_id='class5'):
             operator=operator.eq,
         ),
     ))
-    real_seq.add_child(build_pick_and_place_sequence_dynamic(ros_node))
-    real_seq.add_child(MoveArmBehavior("Box_Arm_Home", ros_node, target_pose=[325.0, 0.0, 0.0, 0.0]))
+    real_seq.add_child(build_pick_and_place_sequence_dynamic(ros_node, ai_target_id))
+    # real_seq.add_child(MoveArmBehavior("Box_Arm_Home", ros_node, target_pose=[325.0, 0.0, 0.0, 0.0]))
     real_seq.add_child(py_trees.behaviours.SetBlackboardVariable(
         name="Set_Just_Picked",
         variable_name="just_picked",
@@ -155,11 +165,27 @@ def build_move_subtree(ros_node, ai_target_id='class5'):
     # subtree.add_child(py_trees.decorators.FailureIsSuccess("Ignore_Align_2", climb_check))
 
     subtree.add_child(DynamicClimbStepBehavior("Auto_Climb", ros_node))
-    subtree.add_child(MoveRelativeOdomBehavior(
+    move_center_selector = py_trees.composites.Selector("move_center", memory=False)
+    
+    move_high = py_trees.composites.Sequence("Move_high", memory=True)
+    move_high.add_child(IsClimbingUpCondition("Is_Higher", ros_node))
+    move_high.add_child(MoveRelativeOdomBehavior(
         "Move_Into_Cell", ros_node,
         climb_dist=NAV_PARAMS['climb_dist'],
         flat_dist=NAV_PARAMS['flat_dist'],
     ))
+
+    move_low = py_trees.composites.Sequence("move_low", memory=True)
+    move_low.add_child(MoveRelativeOdomBehavior(
+        "Move_low_to_cell", ros_node,
+        climb_dist=0.1,
+        flat_dist=1.2
+    ))
+    move_center_selector.add_children([
+        move_high,
+        move_low
+    ])
+    subtree.add_child(move_center_selector)
     subtree.add_child(py_trees.behaviours.SetBlackboardVariable(
         name="Reset_Just_Picked",
         variable_name="just_picked",

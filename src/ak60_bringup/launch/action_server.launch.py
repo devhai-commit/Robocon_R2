@@ -54,11 +54,19 @@ def generate_launch_description():
         output='screen'
     )
 
+    k230_align_node = Node(
+        package='ak60_bringup',
+        executable='k230_align_server.py',
+        name='k230_cam_server',
+        output='screen'
+    )
+
     return LaunchDescription([
         TimerAction(period=1.0, actions=[odom_nav_node]),
         TimerAction(period=1.0, actions=[step_climb_node]),
         TimerAction(period=1.0, actions=[arm_server_node]),
         TimerAction(period=1.0, actions=[lidar_align_node]),
         TimerAction(period=1.0, actions=[esp32_arm_node]),
-        TimerAction(period=1.0, actions=[tracking_server_node])
+        TimerAction(period=1.0, actions=[tracking_server_node]),
+        TimerAction(period=1.0, actions=[k230_align_node]),
     ])

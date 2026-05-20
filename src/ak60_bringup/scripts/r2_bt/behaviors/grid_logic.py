@@ -24,6 +24,7 @@ class WaitForStartSignalBehavior(py_trees.behaviour.Behaviour):
         self.blackboard.register_key(key="gui_start_raw", access=py_trees.common.Access.READ)
         self.blackboard.register_key(key="priority_col", access=py_trees.common.Access.WRITE)
         self.blackboard.register_key(key="target_boxes_list", access=py_trees.common.Access.WRITE)
+        self.blackboard.register_key(key="entrance_boxes", access=py_trees.common.Access.WRITE)
 
     def update(self):
         if not self.blackboard.exists("gui_start_raw"):
@@ -45,6 +46,7 @@ class WaitForStartSignalBehavior(py_trees.behaviour.Behaviour):
 
         self.blackboard.priority_col = data.get("priority_col", 2)
         self.blackboard.target_boxes_list = [tuple(box) for box in data.get("target_boxes", [])]
+        self.blackboard.entrance_boxes = [tuple(box) for box in data.get("entrance_boxes", [])]
         return py_trees.common.Status.SUCCESS
 
 
