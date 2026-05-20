@@ -42,9 +42,14 @@ latest = {
 
 WATCHDOG_SEC = 5.0
 
+# So lan nhan "empty" lien tiep truoc khi thuc su xoa offset_x
+EMPTY_DEBOUNCE_COUNT = 3
+_empty_count = 0
+
 
 def handle_message(msg):
     """Xu ly 1 dict JSON da parse tu K230. Cap nhat 'latest' va in log."""
+    global _empty_count
     now = time.time()
     latest["last_msg_t"] = now
     latest["alive"]      = True
@@ -67,6 +72,7 @@ def handle_message(msg):
     status = msg.get("status")
 
     if status == "detect":
+        _empty_count = 0   # reset debounce khi co detect
         latest["target"]    = msg.get("target")
         latest["cx"]        = msg.get("cx")
         latest["cy"]        = msg.get("cy")
@@ -85,11 +91,18 @@ def handle_message(msg):
               f"n={latest['n_obj']}")
 
     elif status == "empty":
-        latest["target"]    = None
-        latest["direction"] = "NONE"
-        latest["centered"]  = False
-        latest["n_obj"]     = 0
-        print("EMPTY  (khong co object trong khung hinh)")
+        _empty_count += 1
+        if _empty_count >= EMPTY_DEBOUNCE_COUNT:
+            latest["target"]    = None
+            latest["offset_x"]  = None
+            latest["cx"]        = None
+            latest["cy"]        = None
+            latest["area"]      = None
+            latest["score"]     = None
+            latest["direction"] = "NONE"
+            latest["centered"]  = False
+            latest["n_obj"]     = 0
+        print(f"EMPTY  ({_empty_count}/{EMPTY_DEBOUNCE_COUNT}) (khong co object trong khung hinh)")
 
     elif status == "alive":
         print(f"HEARTBEAT (uptime_frame={msg.get('uptime_frame')})")

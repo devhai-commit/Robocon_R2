@@ -70,27 +70,51 @@ def send_uart(data_dict):
 # ==========================================
 # DO PHAN GIAI VA VUNG TAM
 # ==========================================
+# QUAN TRONG:
+#   libs/YOLO.YOLO11 scale boxes ve khong gian DISPLAY (DISP_W x DISP_H),
+#   KHONG phai khong gian PROC. Vi vay cx, cy, w, h tu yolo.run() da o DISP.
+#   => Tinh tam khung va ve OSD truc tiep trong khong gian DISP, KHONG scale lai.
 PROC_W = 640
 PROC_H = 360
 DISP_W = 640
 DISP_H = 480
 
-CAM_CENTER_X = float(PROC_W) / 2.0
-CAM_CENTER_Y = float(PROC_H) / 2.0
+# Tam khung tinh theo DISP vi boxes da o DISP space
+CAM_CENTER_X = float(DISP_W) / 2.0
+CAM_CENTER_Y = float(DISP_H) / 2.0
 
 CENTER_TOLERANCE = 30.0   # pixel - khoang dung sai coi nhu "o giua"
+
+# ==========================================
+# VUNG NHAN DIEN (ROI) - tinh theo khong gian DISP
+# Chi chap nhan detection co TAM nam trong vung nay.
+# Giam ty le de thu hep vung nhan dien.
+# ==========================================
+ROI_W_RATIO = 0.5    # 50% chieu ngang (lay giua)
+ROI_H_RATIO = 0.5    # 60% chieu doc   (lay giua)
+
+_roi_half_w = DISP_W * ROI_W_RATIO / 2.0
+_roi_half_h = DISP_H * ROI_H_RATIO / 2.0
+ROI_X1 = CAM_CENTER_X - _roi_half_w
+ROI_Y1 = CAM_CENTER_Y - _roi_half_h
+ROI_X2 = CAM_CENTER_X + _roi_half_w
+ROI_Y2 = CAM_CENTER_Y + _roi_half_h
+
+
+def in_roi(cx, cy):
+    return (ROI_X1 <= cx <= ROI_X2) and (ROI_Y1 <= cy <= ROI_Y2)
 
 # ==========================================
 # CAU HINH YOLO
 # ==========================================
 LABELS = ["Target"]                          # Chi 1 class
-KMODEL_PATH      = "/sdcard/kmodel/best.kmodel"
+KMODEL_PATH      = "/sdcard/kmodel/yolo11m.kmodel"
 MODEL_INPUT_SIZE = [320, 320]
 DISPLAY_MODE     = "lcd"
 
-CONF_THRESHOLD = 0.45
+CONF_THRESHOLD = 0.4
 NMS_THRESHOLD  = 0.2
-MAX_BOXES      = 10
+MAX_BOXES      = 1
 
 # ==========================================
 # CAU HINH TRUYEN DU LIEU
@@ -98,6 +122,12 @@ MAX_BOXES      = 10
 PERIODIC_SEND_EVERY = 5
 HEARTBEAT_SEC       = 2.0
 GC_EVERY_N_FRAME    = 100
+
+# Debounce: chi gui "detect" khi cx on dinh >= N frame lien tiep
+STABLE_MIN_FRAMES     = 3
+STABLE_CX_TOLERANCE   = 20.0   # pixel — cx dao dong trong vung nay van coi la on dinh
+# Debounce: chi gui "empty" khi mat object >= N frame lien tiep
+EMPTY_DEBOUNCE_FRAMES = 5
 
 
 def get_detections(res):
@@ -128,6 +158,8 @@ def get_detections(res):
                 continue
             cx   = x + w / 2.0
             cy   = y + h / 2.0
+            if not in_roi(cx, cy):
+                continue
             area = w * h
             if cls_id < len(LABELS):
                 name = LABELS[cls_id].upper()
@@ -137,6 +169,10 @@ def get_detections(res):
                 "name"  : name,
                 "cx"    : cx,
                 "cy"    : cy,
+                "x"     : x,
+                "y"     : y,
+                "w"     : w,
+                "h"     : h,
                 "area"  : area,
                 "score" : score,
             })
@@ -204,7 +240,7 @@ if __name__ == "__main__":
             labels=LABELS,
             rgb888p_size=[PROC_W, PROC_H],
             model_input_size=MODEL_INPUT_SIZE,
-            display_size=[PROC_W, PROC_H],
+            display_size=[DISP_W, DISP_H],
             conf_thresh=CONF_THRESHOLD,
             nms_thresh=NMS_THRESHOLD,
             max_boxes_num=MAX_BOXES,
@@ -212,14 +248,15 @@ if __name__ == "__main__":
         )
         yolo.config_preprocess()
 
-        pl = PipeLine(rgb888p_size=[PROC_W, PROC_H], display_mode=DISPLAY_MODE)
+        pl = PipeLine(rgb888p_size=[PROC_W, PROC_H], display_size=[DISP_W, DISP_H], display_mode=DISPLAY_MODE)
         pl.create()
 
         last_printed_state = None
-        stable_count       = 0
-        prev_layout        = []
         frame_idx          = 0
         last_heartbeat     = time.ticks_ms()
+        stable_cx          = None   # cx cua target dang theo doi
+        stable_count       = 0      # so frame cx on dinh lien tiep
+        empty_count        = 0      # so frame lien tiep khong co object
 
         while True:
             with ScopedTiming("total", 0):
@@ -227,7 +264,11 @@ if __name__ == "__main__":
                 frame_idx += 1
 
                 res = yolo.run(img)
-                yolo.draw_result(res, pl.osd_img)
+                # Xoa OSD truoc khi tu ve (tranh ve chong len frame cu)
+                try:
+                    pl.osd_img.clear()
+                except Exception:
+                    pass
 
                 # ----- Warm-up 60 frame dau -----
                 if frame_idx < 60:
@@ -248,39 +289,49 @@ if __name__ == "__main__":
                     gc.collect()
 
                 dets = get_detections(res)
+                nearest = find_nearest(dets)
 
-                # ----- Kiem tra layout on dinh -----
-                layout_names = [d["name"] for d in sorted(dets, key=lambda d: d["cx"])]
-                if layout_names == prev_layout:
-                    stable_count += 1
-                else:
-                    prev_layout  = layout_names
-                    stable_count = 1
-
-                # ----- Quyet dinh gui du lieu -----
-                if stable_count >= 3:
-                    nearest = find_nearest(dets)
-
-                    if nearest:
-                        offset_x, centered, direction = centering_status(nearest["cx"])
-                        state_key = (tuple(layout_names), centered, direction)
+                # ----- Debounce: kiem tra on dinh cx -----
+                if nearest:
+                    empty_count = 0
+                    cx_now = nearest["cx"]
+                    if stable_cx is None or abs(cx_now - stable_cx) > STABLE_CX_TOLERANCE:
+                        # cx nhay qua object khac hoac lan dau detect -> reset dem
+                        stable_cx    = cx_now
+                        stable_count = 1
                     else:
-                        state_key = ("TRONG",)
-                        offset_x  = 0.0
-                        centered  = False
-                        direction = "NONE"
+                        stable_count += 1
+                        stable_cx = cx_now  # cap nhat dan
+                else:
+                    stable_cx    = None
+                    stable_count = 0
+                    empty_count += 1
 
+                # Chi duoc gui "detect" khi cx da on dinh du N frame
+                detect_ready = (nearest is not None and stable_count >= STABLE_MIN_FRAMES)
+                # Chi duoc gui "empty" khi object mat du N frame
+                empty_ready  = (nearest is None and empty_count >= EMPTY_DEBOUNCE_FRAMES)
+
+                if detect_ready:
+                    offset_x, centered, direction = centering_status(nearest["cx"])
+                    state_key = (centered, direction)
                     state_changed = (state_key != last_printed_state)
-                    periodic_send = (nearest is not None and frame_idx % PERIODIC_SEND_EVERY == 0)
-
+                    periodic_send = (frame_idx % PERIODIC_SEND_EVERY == 0)
                     if state_changed or periodic_send:
                         last_printed_state = state_key
-                        if not dets:
-                            send_uart({"status": "empty"})
-                        else:
-                            send_uart(build_detect_payload(
-                                nearest, offset_x, centered, direction, len(dets)
-                            ))
+                        send_uart(build_detect_payload(
+                            nearest, offset_x, centered, direction, len(dets)
+                        ))
+                elif empty_ready:
+                    if last_printed_state != ("TRONG",):
+                        last_printed_state = ("TRONG",)
+                        send_uart({"status": "empty"})
+                else:
+                    # Dang trong thoi gian debounce — khong gui gi
+                    nearest   = None
+                    offset_x  = 0.0
+                    centered  = False
+                    direction = "NONE"
 
                 # ----- Heartbeat khi rong -----
                 now_ms = time.ticks_ms()
@@ -291,21 +342,35 @@ if __name__ == "__main__":
                     last_heartbeat = now_ms
 
                 # ==========================================
-                # VE LEN MAN HINH
+                # VE LEN MAN HINH (toa do trong khong gian DISP)
+                # cx, cy tu yolo.run() da o khong gian DISP nen KHONG scale lai
                 # ==========================================
                 left_bound  = int(CAM_CENTER_X - CENTER_TOLERANCE)
                 right_bound = int(CAM_CENTER_X + CENTER_TOLERANCE)
                 cam_cx_int  = int(CAM_CENTER_X)
-                proc_h_int  = int(PROC_H)
+                disp_h_int  = int(DISP_H)
 
-                pl.osd_img.draw_line(left_bound,  0, left_bound,  proc_h_int - 1, color=(0, 255, 0), thickness=1)
-                pl.osd_img.draw_line(right_bound, 0, right_bound, proc_h_int - 1, color=(0, 255, 0), thickness=1)
-                pl.osd_img.draw_line(cam_cx_int,  0, cam_cx_int,  proc_h_int - 1, color=(255, 255, 0), thickness=2)
+                pl.osd_img.draw_line(left_bound,  0, left_bound,  disp_h_int - 1, color=(0, 255, 0), thickness=1)
+                pl.osd_img.draw_line(right_bound, 0, right_bound, disp_h_int - 1, color=(0, 255, 0), thickness=1)
+                pl.osd_img.draw_line(cam_cx_int,  0, cam_cx_int,  disp_h_int - 1, color=(255, 255, 0), thickness=2)
+
+                # Khung ROI (vung nhan dien)
+                roi_x1 = int(ROI_X1); roi_y1 = int(ROI_Y1)
+                roi_x2 = int(ROI_X2); roi_y2 = int(ROI_Y2)
+                pl.osd_img.draw_rectangle(
+                    roi_x1, roi_y1, roi_x2 - roi_x1, roi_y2 - roi_y1,
+                    color=(0, 200, 255), thickness=2
+                )
 
                 for d in dets:
                     off, cent, _ = centering_status(d["cx"])
-                    dot_color = (0, 255, 0) if cent else (255, 80, 0)
-                    pl.osd_img.draw_circle(int(d["cx"]), int(d["cy"]), 5, color=dot_color, thickness=-1)
+                    box_color = (0, 255, 0) if cent else (255, 80, 0)
+                    bx = int(d["x"]); by = int(d["y"])
+                    bw = int(d["w"]); bh = int(d["h"])
+                    pl.osd_img.draw_rectangle(bx, by, bw, bh, color=box_color, thickness=2)
+                    label_txt = d["name"] + " " + ("%.2f" % d["score"])
+                    pl.osd_img.draw_string_advanced(bx, max(0, by - 20), 18, label_txt, color=box_color)
+                    pl.osd_img.draw_circle(int(d["cx"]), int(d["cy"]), 5, color=box_color, thickness=-1)
 
                 if dets:
                     n_obj = find_nearest(dets)
@@ -320,7 +385,7 @@ if __name__ == "__main__":
                         status_str = "Can " + side_txt + " " + ("%.2f" % dist_to_zone) + "px"
                         bar_color  = (255, 80, 0)
                     pl.osd_img.draw_string_advanced(
-                        4, proc_h_int - 30, 24,
+                        4, disp_h_int - 30, 24,
                         n_obj["name"] + " | " + status_str,
                         color=bar_color
                     )
